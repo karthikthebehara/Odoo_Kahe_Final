@@ -11,14 +11,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { kdsAPI } from '../utils/api';
+import { ordersAPI } from '../utils/api';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types / constants
 // ═══════════════════════════════════════════════════════════════════════════════
 const STAGES = [
   {
-    key:   'to_cook',
+    key:   'draft',
     label: 'To Cook',
     icon:  '🔥',
     color: '#f59e0b',
@@ -27,7 +27,7 @@ const STAGES = [
     header: 'from-amber-600 to-amber-500',
   },
   {
-    key:   'preparing',
+    key:   'pending',
     label: 'Preparing',
     icon:  '👨‍🍳',
     color: '#6366f1',
@@ -36,7 +36,7 @@ const STAGES = [
     header: 'from-indigo-600 to-indigo-500',
   },
   {
-    key:   'completed',
+    key:   'paid',
     label: 'Completed',
     icon:  '✅',
     color: '#22c55e',
@@ -47,9 +47,9 @@ const STAGES = [
 ];
 
 const NEXT_STAGE = {
-  to_cook:   'preparing',
-  preparing: 'completed',
-  completed: null,
+  draft:   'pending',
+  pending: 'paid',
+  paid: null,
 };
 
 // Mock data removed in favour of live API
@@ -58,6 +58,7 @@ const NEXT_STAGE = {
 // ═══════════════════════════════════════════════════════════════════════════════
 function elapsed(iso) {
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 0) return '0s';
   if (diff < 60) return `${diff}s`;
   return `${Math.floor(diff / 60)}m ${diff % 60}s`;
 }
@@ -112,7 +113,7 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
   const allDone = order.items.every(i => i.kds_status === 'completed');
   const next = NEXT_STAGE[order.status];
 
-  const isUrgent = stage.key === 'to_cook' &&
+  const isUrgent = stage.key === 'draft' &&
     (Date.now() - new Date(order.created_at)) > 10 * 60 * 1000;
 
   return (
@@ -124,10 +125,12 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
                   ${isUrgent ? 'border-red-500/50 ring-red-500/20 animate-pulse-slow' : `border-gray-700/60 ${stage.ring}`}
                   ${next ? 'active:scale-[0.99]' : 'cursor-default'}`}
     >
-      {/* Ticket header */}
-      <div className={`bg-gradient-to-r ${stage.header} px-4 py-2.5 flex items-center justify-between`}>
+      {/* Header */}
+      <div className={`p-3 bg-gradient-to-r ${stage.header} text-white flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          <span className="text-white font-bold text-sm">{order.order_number}</span>
+          <div className="bg-white/20 rounded px-2 py-0.5 text-sm font-bold shadow-sm">
+            #{order.id}
+          </div>
           {order.table_label && (
             <span className="text-white/70 text-xs bg-white/10 px-1.5 py-0.5 rounded-md">
               {order.table_label}
@@ -191,7 +194,7 @@ export default function Kds() {
   // ── Load orders from API ────────────────────────────────────────────────
   const fetchOrders = useCallback(async () => {
     try {
-      const data = await kdsAPI.list().catch(() => null);
+      const data = await ordersAPI.list().catch(() => null);
       if (data && Array.isArray(data)) {
         setOrders(data);
         setLastSync(new Date());
@@ -218,14 +221,14 @@ export default function Kds() {
               status: nextStatus,
               items: o.items.map(i => ({
                 ...i,
-                kds_status: nextStatus === 'completed' ? 'completed' : i.kds_status,
+                kds_status: nextStatus === 'paid' ? 'completed' : i.kds_status,
               })),
             }
           : o
       )
     );
     try {
-      await kdsAPI.updateStatus(orderId, nextStatus);
+      await ordersAPI.updateStatus(orderId, nextStatus);
     } catch { /* optimistic UI — revert on repeated failure if needed */ }
   }, []);
 
@@ -241,19 +244,14 @@ export default function Kds() {
         ),
       } : o)
     );
-    try {
-      const item = orders.flatMap(o => o.items).find(i => i.id === itemId);
-      if (item) {
-        await kdsAPI.updateItem(orderId, itemId, item.kds_status === 'completed' ? false : true);
-      }
-    } catch { /* optimistic */ }
-  }, [orders]);
+    // Removed API call because the current backend schema does not track item completion state
+  }, []);
 
   // ── Filter ──────────────────────────────────────────────────────────────
   const filtered = orders.filter(o => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return o.order_number.toLowerCase().includes(q)
+    return (o.id ? o.id.toString() : '').includes(q)
       || (o.table_label || '').toLowerCase().includes(q)
       || o.items.some(i => i.product_name.toLowerCase().includes(q));
   });

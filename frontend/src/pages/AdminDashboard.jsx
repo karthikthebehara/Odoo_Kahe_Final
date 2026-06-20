@@ -1,117 +1,1821 @@
-/**
- * frontend/src/pages/AdminDashboard.jsx
- * Placeholder for the backend admin panel.
- * Will be expanded with full CRUD views in subsequent tasks.
- */
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api, {
+  categoriesAPI,
+  productsAPI,
+  paymentMethodsAPI,
+  couponsAPI,
+  employeesAPI,
+  reportsAPI,
+  tablesAPI
+} from '../utils/api';
 
 const NAV = [
+  { icon: '📊', label: 'Reports',            path: '/admin/reports' },
   { icon: '📦', label: 'Products',           path: '/admin/products' },
   { icon: '🏷️', label: 'Categories',         path: '/admin/categories' },
   { icon: '💳', label: 'Payment Methods',    path: '/admin/payments' },
   { icon: '🎟️', label: 'Coupon & Promotion', path: '/admin/coupons' },
-  { icon: '📅', label: 'Bookings',           path: '/admin/bookings' },
+  { icon: '📅', label: 'Tables & Floors',    path: '/admin/bookings' },
   { icon: '👥', label: 'Users / Employees',  path: '/admin/users' },
-  { icon: '🍳', label: 'Kitchen Display',    path: '/kds' },
-  { icon: '📊', label: 'Reports',            path: '/admin/reports' },
 ];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
+  const currentPath = location.pathname;
+
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
   return (
-    <div className="min-h-screen bg-gray-950 flex">
+    <div className="min-h-screen bg-gray-950 flex font-sans antialiased text-gray-200">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+      <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-lg">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-amber-500/10">
               ☕
             </div>
             <div>
-              <p className="text-white font-bold text-sm">Odoo Cafe POS</p>
-              <p className="text-gray-500 text-xs">Admin Panel</p>
+              <p className="text-white font-extrabold text-sm tracking-tight">Odoo Cafe POS</p>
+              <p className="text-gray-500 text-xs font-semibold">Admin Panel</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400
-                         hover:text-white hover:bg-gray-800 transition-all text-sm font-medium"
-            >
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+          <button
+            onClick={() => navigate('/admin')}
+            className={`w-full text-left flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-sm font-semibold ${
+              currentPath === '/admin' || currentPath === '/admin/'
+                ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-lg">🏠</span> Dashboard Overview
+          </button>
+
+          {NAV.map(item => {
+            const isActive = currentPath === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className={`w-full text-left flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-sm font-semibold ${
+                  isActive
+                    ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <span className="text-lg">{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="px-3 py-4 border-t border-gray-800 space-y-2">
+        <div className="px-4 py-5 border-t border-gray-800 space-y-2 flex-shrink-0">
           <button
             onClick={() => navigate('/pos')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-amber-400
-                       hover:bg-amber-500/10 transition-colors text-sm font-semibold"
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-3 rounded-2xl bg-gray-800 hover:bg-gray-700 text-amber-400 border border-gray-700 hover:border-gray-600 transition-colors text-xs font-bold"
           >
-            <span>🖥️</span> Open POS Terminal
+            🖥️ Open POS Terminal
           </button>
           <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500
-                       hover:text-red-400 hover:bg-red-500/10 transition-colors text-sm"
+            onClick={() => navigate('/kds')}
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-3 rounded-2xl bg-gray-800 hover:bg-gray-700 text-orange-400 border border-gray-700 hover:border-gray-600 transition-colors text-xs font-bold"
           >
-            <span>🚪</span> Log Out
+            🍳 Open Kitchen Monitor
+          </button>
+          <button
+            onClick={() => { logout(); navigate('/login'); }}
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-3 rounded-2xl bg-red-500/5 hover:bg-red-500/10 text-red-400 border border-red-500/10 hover:border-red-500/20 transition-colors text-xs font-semibold"
+          >
+            🚪 Log Out
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 p-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">
-            Welcome back, {user?.name || 'Admin'} 👋
-          </h1>
-          <p className="text-gray-400 mt-1">Manage your cafe from the panel below.</p>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Top header bar */}
+        <header className="flex-shrink-0 h-16 border-b border-gray-800 flex items-center justify-between px-8 bg-gray-900/40">
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest">
+            <span>Admin</span>
+            <span>/</span>
+            <span className="text-gray-300">
+              {currentPath === '/admin' || currentPath === '/admin/'
+                ? 'Dashboard'
+                : NAV.find(n => n.path === currentPath)?.label || 'Overview'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-gray-400 text-xs font-semibold">Active Session:</span>
+            <span className="bg-amber-500/10 text-amber-400 border border-amber-500/25 px-2.5 py-1 rounded-full text-xs font-bold">
+              Admin Mode
+            </span>
+            <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center font-bold text-white text-xs">
+              {user?.name?.charAt(0)}
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Panels */}
+        <div className="flex-1 overflow-y-auto p-8 bg-gray-950">
+          {currentPath === '/admin' || currentPath === '/admin/' ? (
+            <DashboardOverview navigate={navigate} />
+          ) : currentPath === '/admin/reports' ? (
+            <ReportsPanel />
+          ) : currentPath === '/admin/products' ? (
+            <ProductsPanel />
+          ) : currentPath === '/admin/categories' ? (
+            <CategoriesPanel />
+          ) : currentPath === '/admin/payments' ? (
+            <PaymentMethodsPanel />
+          ) : currentPath === '/admin/coupons' ? (
+            <PromotionsPanel />
+          ) : currentPath === '/admin/bookings' ? (
+            <BookingsPanel />
+          ) : currentPath === '/admin/users' ? (
+            <EmployeesPanel />
+          ) : (
+            <div className="text-center py-12 text-gray-500">View not found</div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUBPATH VIEW PANELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function DashboardOverview({ navigate }) {
+  return (
+    <div className="space-y-8 animate-in fade-in duration-200">
+      <div>
+        <h1 className="text-3xl font-black text-white tracking-tight">System Administration Overview</h1>
+        <p className="text-gray-400 mt-1">Select an administrative area from the sidebar or click a shortcut below to begin configuring the café.</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {NAV.map(item => (
+          <button
+            key={item.path}
+            onClick={() => navigate(item.path)}
+            className="bg-gray-900/60 hover:bg-gray-900 border border-gray-800/80 hover:border-amber-500/40 rounded-2xl p-6 text-left transition-all duration-200 hover:-translate-y-0.5 group shadow-lg"
+          >
+            <div className="text-3xl mb-3">{item.icon}</div>
+            <h3 className="text-white font-extrabold text-sm group-hover:text-amber-400 transition-colors">{item.label}</h3>
+            <p className="text-gray-500 text-xs mt-1.5 leading-relaxed">Click to launch the directory control pane for this module.</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="p-6 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl shadow-amber-500/5">
+        <div>
+          <h2 className="text-white font-extrabold text-lg">Launch Point-of-Sale Shift</h2>
+          <p className="text-gray-400 text-sm mt-1">Open the cashier terminal interface to start checkout sessions and record sales.</p>
+        </div>
+        <button
+          onClick={() => navigate('/pos')}
+          className="px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-black rounded-2xl shadow-xl shadow-amber-500/25 transition-all hover:scale-105"
+        >
+          Open POS Cashier →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── PRODUCTS PANEL ────────────────────────────────────────────────────────────
+function ProductsPanel() {
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+
+  // Form Fields
+  const [editId, setEditId] = useState(null);
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [uom, setUom] = useState('unit');
+  const [tax, setTax] = useState('5.00');
+  const [desc, setDesc] = useState('');
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [p, c] = await Promise.all([productsAPI.list(), categoriesAPI.list()]);
+      setProducts(p || []);
+      setCategories(c || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const filteredProducts = useMemo(() => {
+    const s = search.toLowerCase();
+    return products.filter(p => {
+      const matchQ = p.name.toLowerCase().includes(s);
+      const matchC = !catFilter || p.category_id === Number(catFilter);
+      return matchQ && matchC;
+    });
+  }, [products, search, catFilter]);
+
+  const handleEdit = (p) => {
+    setEditId(p.id);
+    setName(p.name);
+    setPrice(p.price);
+    setCategoryId(p.category_id || '');
+    setUom(p.uom);
+    setTax(p.tax);
+    setDesc(p.description || '');
+    setIsAvailable(p.is_available === 1 || p.is_available === true);
+    setFormOpen(true);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name || !price) { setError('Name and Price are required.'); return; }
+    setError('');
+    const data = {
+      name,
+      price: parseFloat(price),
+      category_id: categoryId ? Number(categoryId) : null,
+      uom,
+      tax: parseFloat(tax),
+      description: desc || null,
+      is_available: isAvailable
+    };
+
+    try {
+      if (editId) {
+        await productsAPI.update(editId, data);
+      } else {
+        await productsAPI.create(data);
+      }
+      loadData();
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save product.');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      await productsAPI.delete(id);
+      loadData();
+    } catch (err) {
+      alert('Failed to delete product: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditId(null);
+    setName('');
+    setPrice('');
+    setCategoryId('');
+    setUom('unit');
+    setTax('5.00');
+    setDesc('');
+    setIsAvailable(true);
+    setFormOpen(false);
+    setError('');
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white">Menu Products CRUD</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Manage products catalog, prices, and categories</p>
+        </div>
+        <button
+          onClick={() => { resetForm(); setFormOpen(true); }}
+          className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-sm"
+        >
+          + Add New Product
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSave} className="bg-gray-900 border border-gray-700 rounded-3xl w-full max-w-lg p-8 space-y-4 animate-in zoom-in-95 duration-200">
+            <h2 className="text-white font-bold text-lg">{editId ? 'Edit Product' : 'Add New Product'}</h2>
+            {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>}
+            
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Product Name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Price (₹)"
+                  value={price}
+                  onChange={e => setPrice(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                <select
+                  value={categoryId}
+                  onChange={e => setCategoryId(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="UoM (e.g. unit, slice, cup)"
+                  value={uom}
+                  onChange={e => setUom(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Tax GST (%)"
+                  value={tax}
+                  onChange={e => setTax(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                />
+              </div>
+
+              <textarea
+                placeholder="Product Description"
+                value={desc}
+                onChange={e => setDesc(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors h-24 resize-none"
+              />
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="avail"
+                  checked={isAvailable}
+                  onChange={e => setIsAvailable(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-gray-850 border-gray-700"
+                />
+                <label htmlFor="avail" className="text-sm text-gray-300">Available for Sale</label>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button type="submit" className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-all">
+                Save Product
+              </button>
+              <button type="button" onClick={resetForm} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Filter and search bar */}
+      <div className="flex flex-col sm:flex-row gap-2.5">
+        <input
+          type="text"
+          placeholder="Search products by name..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 bg-gray-900 border border-gray-800 text-white text-xs rounded-xl px-4 py-3.5 focus:outline-none focus:border-amber-500 transition-colors"
+        />
+        <select
+          value={catFilter}
+          onChange={e => setCatFilter(e.target.value)}
+          className="bg-gray-900 border border-gray-800 text-white text-xs rounded-xl px-4 py-3.5 focus:outline-none focus:border-amber-500 transition-colors sm:w-48"
+        >
+          <option value="">All Categories</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      {/* Products Table */}
+      <div className="bg-gray-900 border border-gray-800/80 rounded-2xl overflow-hidden shadow-lg">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500 text-sm">Loading products catalog...</div>
+        ) : filteredProducts.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-950/40 text-gray-400 text-[10px] font-bold uppercase tracking-wider border-b border-gray-850">
+                  <th className="px-6 py-4">Product Name</th>
+                  <th className="px-6 py-4">Category</th>
+                  <th className="px-6 py-4 text-right">Price</th>
+                  <th className="px-6 py-4 text-center">Tax / UoM</th>
+                  <th className="px-6 py-4 text-center">Status</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-850 text-xs">
+                {filteredProducts.map(p => (
+                  <tr key={p.id} className="hover:bg-gray-800/20 text-gray-300">
+                    <td className="px-6 py-4 font-bold text-white">{p.name}</td>
+                    <td className="px-6 py-4 text-gray-400">{p.category_name || 'Unassigned'}</td>
+                    <td className="px-6 py-4 text-right text-amber-400 font-extrabold">₹{Number(p.price).toFixed(2)}</td>
+                    <td className="px-6 py-4 text-center text-gray-500 font-medium">
+                      {p.tax}% GST / {p.uom}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${p.is_available === 1 || p.is_available === true ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                        {p.is_available === 1 || p.is_available === true ? 'Active' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-3">
+                        <button onClick={() => handleEdit(p)} className="text-amber-500 hover:text-amber-400 font-bold transition-colors">Edit</button>
+                        <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 font-bold transition-colors">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12 text-gray-500 text-sm">No products found.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── CATEGORIES PANEL ──────────────────────────────────────────────────────────
+function CategoriesPanel() {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#3498db');
+  const [editId, setEditId] = useState(null);
+  const [error, setError] = useState('');
+
+  const loadCategories = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await categoriesAPI.list();
+      setCategories(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name) { setError('Category Name is required.'); return; }
+    setError('');
+    try {
+      if (editId) {
+        await categoriesAPI.update(editId, { name, color });
+      } else {
+        await categoriesAPI.create({ name, color });
+      }
+      setName('');
+      setColor('#3498db');
+      setEditId(null);
+      loadCategories();
+    } catch (err) {
+      setError(err.message || 'Failed to save category.');
+    }
+  };
+
+  const handleEdit = (c) => {
+    setEditId(c.id);
+    setName(c.name);
+    setColor(c.color || '#3498db');
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this category and its product relations?')) return;
+    try {
+      await categoriesAPI.delete(id);
+      loadCategories();
+    } catch (err) {
+      alert('Failed to delete category: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-200">
+      {/* Category Editor */}
+      <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 h-fit space-y-4 shadow-lg">
+        <h2 className="text-white font-extrabold text-base">{editId ? 'Edit Category' : 'Create Category'}</h2>
+        
+        <form onSubmit={handleSave} className="space-y-4">
+          {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>}
+          
+          <div className="space-y-2">
+            <label className="text-gray-400 text-xs font-semibold">Category Name</label>
+            <input
+              type="text"
+              placeholder="e.g. Cold Coffee, Croissants"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors font-medium"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-gray-400 text-xs font-semibold">Theme Color Picker</label>
+            <div className="flex gap-2">
+              <input
+                type="color"
+                value={color}
+                onChange={e => setColor(e.target.value)}
+                className="w-12 h-10 bg-gray-800 border border-gray-750 p-1.5 rounded-xl cursor-pointer"
+              />
+              <input
+                type="text"
+                value={color}
+                onChange={e => setColor(e.target.value)}
+                placeholder="#3498db"
+                className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button type="submit" className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-all text-xs">
+              {editId ? 'Update Category' : 'Create Category'}
+            </button>
+            {editId && (
+              <button
+                type="button"
+                onClick={() => { setEditId(null); setName(''); setColor('#3498db'); }}
+                className="flex-1 py-3 bg-gray-800 hover:bg-gray-750 text-white font-semibold rounded-xl transition-all text-xs"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* Categories List */}
+      <div className="lg:col-span-2 space-y-4">
+        <div>
+          <h1 className="text-2xl font-black text-white">Menu Categories CRUD</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Define categories and color themes for the POS grid</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {NAV.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="bg-gray-900/80 border border-gray-700/60 hover:border-amber-500/40
-                         rounded-2xl p-6 text-center transition-all duration-200 hover:bg-gray-800/80
-                         hover:-translate-y-0.5 group"
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
+          {loading ? (
+            <div className="text-center py-12 text-gray-500 text-sm">Loading categories...</div>
+          ) : categories.length > 0 ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-950/40 text-gray-400 text-[10px] font-bold uppercase tracking-wider border-b border-gray-850">
+                  <th className="px-6 py-4">Theme Color</th>
+                  <th className="px-6 py-4">Category Name</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-850 text-xs">
+                {categories.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-800/20 text-gray-300">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-md border border-gray-750 shadow-md" style={{ backgroundColor: c.color }} />
+                        <span className="font-mono text-gray-500 text-[10px] uppercase font-bold">{c.color}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-white">{c.name}</td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-3">
+                        <button onClick={() => handleEdit(c)} className="text-amber-500 hover:text-amber-400 font-bold transition-colors">Edit</button>
+                        <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:text-red-400 font-bold transition-colors">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-12 text-gray-500 text-sm">No categories configured.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PAYMENT METHODS PANEL ─────────────────────────────────────────────────────
+function PaymentMethodsPanel() {
+  const [methods, setMethods] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+
+  // Form Fields
+  const [editId, setEditId] = useState(null);
+  const [name, setName] = useState('');
+  const [type, setType] = useState('cash');
+  const [isEnabled, setIsEnabled] = useState(true);
+  const [upiId, setUpiId] = useState('');
+  const [error, setError] = useState('');
+
+  const loadMethods = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await paymentMethodsAPI.list();
+      setMethods(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadMethods(); }, [loadMethods]);
+
+  const handleEdit = (pm) => {
+    setEditId(pm.id);
+    setName(pm.name);
+    setType(pm.type);
+    setIsEnabled(pm.is_enabled === 1 || pm.is_enabled === true);
+    setUpiId(pm.upi_id || '');
+    setFormOpen(true);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name || !type) { setError('Name and Type are required.'); return; }
+    setError('');
+    const data = {
+      name,
+      type,
+      is_enabled: isEnabled,
+      upi_id: type === 'upi' ? upiId : null
+    };
+
+    try {
+      if (editId) {
+        await paymentMethodsAPI.update(editId, data);
+      } else {
+        await paymentMethodsAPI.create(data);
+      }
+      loadMethods();
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save payment method.');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this payment method?')) return;
+    try {
+      await paymentMethodsAPI.delete(id);
+      loadMethods();
+    } catch (err) {
+      alert('Failed to delete payment method: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditId(null);
+    setName('');
+    setType('cash');
+    setIsEnabled(true);
+    setUpiId('');
+    setFormOpen(false);
+    setError('');
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white">Payment Method Setup</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Toggle cash, credit card, or configure merchant UPI QR details</p>
+        </div>
+        <button
+          onClick={() => { resetForm(); setFormOpen(true); }}
+          className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-sm"
+        >
+          + Add Payment Method
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSave} className="bg-gray-900 border border-gray-700 rounded-3xl w-full max-w-md p-8 space-y-4 animate-in zoom-in-95 duration-200">
+            <h2 className="text-white font-bold text-lg">{editId ? 'Edit Payment Method' : 'Add Payment Method'}</h2>
+            {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>}
+
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Method Name (e.g. Cash, Credit/Debit Card, UPI)"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <select
+                value={type}
+                onChange={e => setType(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              >
+                <option value="cash">Cash Register</option>
+                <option value="card">Card Reader/POS</option>
+                <option value="upi">UPI QR Merchant</option>
+              </select>
+
+              {type === 'upi' && (
+                <input
+                  type="text"
+                  placeholder="Merchant UPI ID (e.g. cafe@upi)"
+                  value={upiId}
+                  onChange={e => setUpiId(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors font-mono"
+                />
+              )}
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="availpm"
+                  checked={isEnabled}
+                  onChange={e => setIsEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-gray-850 border-gray-700"
+                />
+                <label htmlFor="availpm" className="text-sm text-gray-300">Enable this payment option</label>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button type="submit" className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-all">
+                Save Method
+              </button>
+              <button type="button" onClick={resetForm} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* List */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="col-span-3 text-center py-12 text-gray-500">Loading payment methods...</div>
+        ) : methods.length > 0 ? (
+          methods.map(pm => (
+            <div
+              key={pm.id}
+              className={`bg-gray-900 border rounded-3xl p-6 flex flex-col justify-between shadow-lg relative overflow-hidden ${pm.is_enabled ? 'border-gray-800' : 'border-gray-800 opacity-60'}`}
             >
-              <div className="text-3xl mb-3">{item.icon}</div>
-              <p className="text-white font-semibold text-sm group-hover:text-amber-400 transition-colors">
-                {item.label}
-              </p>
+              <div className="absolute top-0 right-0 h-1.5 w-full bg-gradient-to-r from-amber-500 to-orange-500" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-3xl">
+                    {pm.type === 'cash' ? '💵' : pm.type === 'card' ? '💳' : '📱'}
+                  </span>
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${pm.is_enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                    {pm.is_enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-white font-extrabold text-base tracking-tight">{pm.name}</h3>
+                  <p className="text-gray-500 text-xs mt-1 capitalize font-medium">Type: {pm.type}</p>
+                  {pm.type === 'upi' && pm.upi_id && (
+                    <div className="mt-3 bg-gray-950/60 border border-gray-850 px-3.5 py-2 rounded-xl text-center">
+                      <p className="text-gray-500 text-[10px] font-bold">MERCHANT UPI ID</p>
+                      <p className="text-amber-500 text-xs font-bold font-mono mt-0.5">{pm.upi_id}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6 pt-4 border-t border-gray-850">
+                <button
+                  onClick={() => handleEdit(pm)}
+                  className="flex-1 py-2 bg-gray-800 hover:bg-gray-750 text-white font-bold rounded-xl transition-all text-xs"
+                >
+                  Configure
+                </button>
+                <button
+                  onClick={() => handleDelete(pm.id)}
+                  className="px-3.5 py-2 bg-red-500/5 hover:bg-red-500/10 text-red-400 border border-red-500/10 rounded-xl transition-all"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-3 text-center py-12 text-gray-500">No payment methods configured.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── COUPON & PROMOTION PANEL ──────────────────────────────────────────────────
+function PromotionsPanel() {
+  const [promotions, setPromotions] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+
+  // Form Fields
+  const [editId, setEditId] = useState(null);
+  const [name, setName] = useState('');
+  const [type, setType] = useState('coupon');
+  const [discountType, setDiscountType] = useState('percentage');
+  const [value, setValue] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [productId, setProductId] = useState('');
+  const [minQty, setMinQty] = useState('');
+  const [minAmt, setMinAmt] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [promos, prods] = await Promise.all([couponsAPI.list(), productsAPI.list()]);
+      setPromotions(promos || []);
+      setProducts(prods || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleEdit = (p) => {
+    setEditId(p.id);
+    setName(p.name);
+    setType(p.type);
+    setDiscountType(p.discount_type);
+    setValue(p.value);
+    setCouponCode(p.coupon_code || '');
+    setProductId(p.product_id || '');
+    setMinQty(p.min_quantity || '');
+    setMinAmt(p.min_order_amount || '');
+    setStartDate(p.start_date ? p.start_date.split('T')[0] : '');
+    setEndDate(p.end_date ? p.end_date.split('T')[0] : '');
+    setIsActive(p.is_active === 1 || p.is_active === true);
+    setFormOpen(true);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name || value === '') { setError('Name and Value are required.'); return; }
+    setError('');
+    
+    const data = {
+      name,
+      type,
+      discount_type: discountType,
+      value: parseFloat(value),
+      coupon_code: type === 'coupon' ? couponCode.trim().toUpperCase() : null,
+      product_id: type === 'automated_product' && productId ? Number(productId) : null,
+      min_quantity: type === 'automated_product' && minQty ? Number(minQty) : null,
+      min_order_amount: type === 'automated_order' && minAmt ? parseFloat(minAmt) : null,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      is_active: isActive
+    };
+
+    try {
+      if (editId) {
+        await couponsAPI.update(editId, data);
+      } else {
+        await couponsAPI.create(data);
+      }
+      loadData();
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save promotion.');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this promotion rule?')) return;
+    try {
+      await couponsAPI.delete(id);
+      loadData();
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditId(null);
+    setName('');
+    setType('coupon');
+    setDiscountType('percentage');
+    setValue('');
+    setCouponCode('');
+    setProductId('');
+    setMinQty('');
+    setMinAmt('');
+    setStartDate('');
+    setEndDate('');
+    setIsActive(true);
+    setFormOpen(false);
+    setError('');
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white">Coupons & Promotions CRUD</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Configure discounts: manual coupons, line volume deals, or spend thresholds</p>
+        </div>
+        <button
+          onClick={() => { resetForm(); setFormOpen(true); }}
+          className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-sm"
+        >
+          + Create Discount Rule
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSave} className="bg-gray-900 border border-gray-700 rounded-3xl w-full max-w-md p-8 space-y-4 animate-in zoom-in-95 duration-200">
+            <h2 className="text-white font-bold text-lg">{editId ? 'Edit Discount Rule' : 'Create Discount Rule'}</h2>
+            {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>}
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              <input
+                type="text"
+                placeholder="Promo Rule Name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={type}
+                  onChange={e => setType(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                >
+                  <option value="coupon">Manual Coupon Code</option>
+                  <option value="automated_product">Automated Product (Line)</option>
+                  <option value="automated_order">Automated Order (Cart)</option>
+                </select>
+                <select
+                  value={discountType}
+                  onChange={e => setDiscountType(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                >
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="fixed_amount">Fixed Amount (₹)</option>
+                </select>
+              </div>
+
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Discount Value"
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+
+              {type === 'coupon' && (
+                <input
+                  type="text"
+                  placeholder="Coupon Code Code (e.g. FLAT50)"
+                  value={couponCode}
+                  onChange={e => setCouponCode(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors font-mono uppercase"
+                />
+              )}
+
+              {type === 'automated_product' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    value={productId}
+                    onChange={e => setProductId(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                  >
+                    <option value="">Select Product</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Min Quantity (Qty >= X)"
+                    value={minQty}
+                    onChange={e => setMinQty(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
+              )}
+
+              {type === 'automated_order' && (
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Min Order Amount (Subtotal >= ₹X)"
+                  value={minAmt}
+                  onChange={e => setMinAmt(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                />
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-gray-500 text-[10px] font-bold">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-gray-500 text-[10px] font-bold">End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="availpromo"
+                  checked={isActive}
+                  onChange={e => setIsActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-gray-850 border-gray-700"
+                />
+                <label htmlFor="availpromo" className="text-sm text-gray-300">Set promotion as Active</label>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button type="submit" className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-all">
+                Save Promo
+              </button>
+              <button type="button" onClick={resetForm} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Promotions Table */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500 text-sm">Loading promotions dashboard...</div>
+        ) : promotions.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-950/40 text-gray-400 text-[10px] font-bold uppercase tracking-wider border-b border-gray-850">
+                  <th className="px-6 py-4">Promo Rule</th>
+                  <th className="px-6 py-4">Trigger Type</th>
+                  <th className="px-6 py-4">Discount Applied</th>
+                  <th className="px-6 py-4 text-center">Active Period</th>
+                  <th className="px-6 py-4 text-center">Status</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-850 text-xs text-gray-300">
+                {promotions.map(p => {
+                  let triggerText = '';
+                  if (p.type === 'coupon') triggerText = `Manual Code: ${p.coupon_code}`;
+                  else if (p.type === 'automated_product') triggerText = `Bulk Line Item (Qty >= ${p.min_quantity})`;
+                  else if (p.type === 'automated_order') triggerText = `Cart Total >= ₹${p.min_order_amount}`;
+
+                  return (
+                    <tr key={p.id} className="hover:bg-gray-800/20">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-white">{p.name}</p>
+                      </td>
+                      <td className="px-6 py-4 text-gray-400 font-medium">{triggerText}</td>
+                      <td className="px-6 py-4 text-amber-400 font-extrabold">
+                        {p.discount_type === 'percentage' ? `${p.value}%` : `₹${p.value}`}
+                      </td>
+                      <td className="px-6 py-4 text-center text-gray-500">
+                        {p.start_date || p.end_date ? (
+                          <>
+                            {p.start_date ? p.start_date.split('T')[0] : 'Open'}
+                            <span className="mx-1">→</span>
+                            {p.end_date ? p.end_date.split('T')[0] : 'Open'}
+                          </>
+                        ) : 'Always'}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${p.is_active === 1 || p.is_active === true ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                          {p.is_active === 1 || p.is_active === true ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-3">
+                          <button onClick={() => handleEdit(p)} className="text-amber-500 hover:text-amber-400 font-bold transition-colors">Edit</button>
+                          <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-400 font-bold transition-colors">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12 text-gray-500 text-sm">No promotions configured.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── TABLES & FLOORS PANEL ──────────────────────────────────────────────────────
+function BookingsPanel() {
+  const [tables, setTables] = useState([]);
+  const [floors, setFloors] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [floorFormOpen, setFloorFormOpen] = useState(false);
+
+  // Table form fields
+  const [editId, setEditId] = useState(null);
+  const [floorId, setFloorId] = useState('');
+  const [tableNumber, setTableNumber] = useState('');
+  const [seats, setSeats] = useState('2');
+  const [status, setStatus] = useState('available');
+  const [error, setError] = useState('');
+
+  // Floor form field
+  const [floorName, setFloorName] = useState('');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [t, f] = await Promise.all([tablesAPI.list(), tablesAPI.floors()]);
+      setTables(t || []);
+      setFloors(f || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleSaveTable = async (e) => {
+    e.preventDefault();
+    if (!floorId || !tableNumber) { setError('Floor and Table Number are required.'); return; }
+    setError('');
+    const data = {
+      floor_id: Number(floorId),
+      table_number: tableNumber,
+      seats: Number(seats),
+      status
+    };
+
+    try {
+      if (editId) {
+        await api.put(`/api/tables/${editId}`, data);
+      } else {
+        await api.post('/api/tables', data);
+      }
+      loadData();
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save table.');
+    }
+  };
+
+  const handleCreateFloor = async (e) => {
+    e.preventDefault();
+    if (!floorName) return;
+    try {
+      await api.post('/api/floors', { name: floorName });
+      setFloorName('');
+      setFloorFormOpen(false);
+      loadData();
+    } catch (err) {
+      alert('Failed to create floor: ' + err.message);
+    }
+  };
+
+  const handleDeleteFloor = async (id) => {
+    if (!window.confirm('Delete this floor and all its tables?')) return;
+    try {
+      await api.delete(`/api/floors/${id}`);
+      loadData();
+    } catch (err) {
+      alert('Failed to delete floor: ' + err.message);
+    }
+  };
+
+  const handleEditTable = (t) => {
+    setEditId(t.id);
+    setFloorId(t.floor_id || '');
+    setTableNumber(t.table_number);
+    setSeats(t.seats);
+    setStatus(t.status);
+    setFormOpen(true);
+  };
+
+  const handleDeleteTable = async (id) => {
+    if (!window.confirm('Delete this table?')) return;
+    try {
+      await api.delete(`/api/tables/${id}`);
+      loadData();
+    } catch (err) {
+      alert('Failed to delete table: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditId(null);
+    setFloorId('');
+    setTableNumber('');
+    setSeats('2');
+    setStatus('available');
+    setFormOpen(false);
+    setError('');
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-200">
+      {/* Overview header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white">Cafe Layout & Table Bookings</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Configure floors, add tables, download table QR tokens, or manage table occupancy</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFloorFormOpen(true)}
+            className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 rounded-xl transition-all text-xs font-bold"
+          >
+            + Add Floor
+          </button>
+          <button
+            onClick={() => { resetForm(); setFormOpen(true); }}
+            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-all text-xs"
+          >
+            + Add Table
+          </button>
+        </div>
+      </div>
+
+      {/* Floor Form overlay */}
+      {floorFormOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleCreateFloor} className="bg-gray-900 border border-gray-700 rounded-3xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-white font-bold text-base">Add New Floor</h3>
+            <input
+              type="text"
+              placeholder="e.g. Ground Floor, Terrace Lounge"
+              value={floorName}
+              onChange={e => setFloorName(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500"
+            />
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 py-2.5 bg-amber-500 text-gray-950 font-bold rounded-xl text-xs">Save</button>
+              <button type="button" onClick={() => setFloorFormOpen(false)} className="flex-1 py-2.5 bg-gray-800 text-white font-semibold rounded-xl text-xs">Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Table Form overlay */}
+      {formOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSaveTable} className="bg-gray-900 border border-gray-700 rounded-3xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-white font-bold text-base">{editId ? 'Edit Table Settings' : 'Create Table'}</h3>
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <div className="space-y-3">
+              <select
+                value={floorId}
+                onChange={e => setFloorId(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs"
+              >
+                <option value="">Select Floor Location</option>
+                {floors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <input
+                type="text"
+                placeholder="Table Number (e.g. T1, R1)"
+                value={tableNumber}
+                onChange={e => setTableNumber(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs font-mono"
+              />
+              <input
+                type="number"
+                placeholder="Seats quantity"
+                value={seats}
+                onChange={e => setSeats(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs"
+              />
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-xs"
+              >
+                <option value="available">Available (Free)</option>
+                <option value="occupied">Occupied (In Use)</option>
+                <option value="reserved">Reserved (Booked)</option>
+              </select>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button type="submit" className="flex-1 py-2.5 bg-amber-500 text-gray-950 font-bold rounded-xl text-xs">Save</button>
+              <button type="button" onClick={resetForm} className="flex-1 py-2.5 bg-gray-800 text-white font-semibold rounded-xl text-xs">Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Floors & Tables grid */}
+      <div className="space-y-6">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading floor layout plans...</div>
+        ) : floors.length > 0 ? (
+          floors.map(f => {
+            const floorTables = tables.filter(t => t.floor_id === f.id);
+            return (
+              <div key={f.id} className="bg-gray-900 border border-gray-800 rounded-3xl p-6 space-y-4 shadow-lg">
+                <div className="flex items-center justify-between border-b border-gray-850 pb-4">
+                  <div>
+                    <h3 className="text-white font-black text-lg tracking-tight">{f.name}</h3>
+                    <p className="text-gray-500 text-xs font-semibold">{floorTables.length} tables configured</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteFloor(f.id)}
+                    className="text-red-400 hover:text-red-300 text-xs font-bold px-3 py-1 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-lg transition-all"
+                  >
+                    Delete Floor
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {floorTables.map(t => (
+                    <div
+                      key={t.id}
+                      className={`p-4 border rounded-2xl flex flex-col justify-between h-36 ${
+                        t.status === 'occupied'
+                          ? 'border-amber-500 bg-amber-500/5'
+                          : t.status === 'reserved'
+                          ? 'border-indigo-500 bg-indigo-500/5'
+                          : 'border-gray-800 bg-gray-800/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <span className="text-white font-black text-base font-mono">{t.table_number}</span>
+                        <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${
+                          t.status === 'occupied'
+                            ? 'bg-amber-500/10 text-amber-400'
+                            : t.status === 'reserved'
+                            ? 'bg-indigo-500/10 text-indigo-400'
+                            : 'bg-emerald-500/10 text-emerald-400'
+                        }`}>
+                          {t.status === 'occupied' ? 'Occupied' : t.status === 'reserved' ? 'Reserved' : 'Free'}
+                        </span>
+                      </div>
+
+                      <div className="text-gray-400 text-xs mt-2 font-medium">
+                        👥 {t.seats} seats
+                      </div>
+
+                      <div className="flex gap-2 mt-4 pt-2 border-t border-gray-850/50">
+                        <button
+                          onClick={() => handleEditTable(t)}
+                          className="flex-1 py-1 text-center bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg text-[10px] transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTable(t.id)}
+                          className="text-red-500 hover:text-red-400 p-1 rounded-lg text-[10px]"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-12 text-gray-500">No floors or tables configured.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── USERS & EMPLOYEES PANEL ────────────────────────────────────────────────────
+function EmployeesPanel() {
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+
+  // Form fields
+  const [editId, setEditId] = useState(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('employee');
+  const [isArchived, setIsArchived] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadEmployees = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await employeesAPI.list();
+      setEmployees(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadEmployees(); }, [loadEmployees]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name || !email || (!editId && !password)) {
+      setError('Name, email, and password are required.');
+      return;
+    }
+    setError('');
+
+    const data = {
+      name,
+      email,
+      role,
+      is_archived: isArchived,
+      password: password || undefined
+    };
+
+    try {
+      if (editId) {
+        await employeesAPI.update(editId, data);
+      } else {
+        await employeesAPI.create(data);
+      }
+      loadEmployees();
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save employee.');
+    }
+  };
+
+  const handleEdit = (emp) => {
+    setEditId(emp.id);
+    setName(emp.name);
+    setEmail(emp.email);
+    setRole(emp.role);
+    setIsArchived(emp.is_archived === 1 || emp.is_archived === true);
+    setPassword('');
+    setFormOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this user permanently?')) return;
+    try {
+      await employeesAPI.delete(id);
+      loadEmployees();
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditId(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setRole('employee');
+    setIsArchived(false);
+    setFormOpen(false);
+    setError('');
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white">Users / Employees Setup</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Add employees, update credentials, change roles, or block/archive staff</p>
+        </div>
+        <button
+          onClick={() => { resetForm(); setFormOpen(true); }}
+          className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-sm"
+        >
+          + Add Staff Account
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSave} className="bg-gray-900 border border-gray-700 rounded-3xl w-full max-w-md p-8 space-y-4 animate-in zoom-in-95 duration-200">
+            <h2 className="text-white font-bold text-lg">{editId ? 'Edit Account' : 'Create Staff Account'}</h2>
+            {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>}
+
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <input
+                type="password"
+                placeholder={editId ? "Leave blank to keep password" : "Enter temporary password"}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors font-mono"
+              />
+
+              <div className="grid grid-cols-1 gap-3">
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none"
+                >
+                  <option value="employee">POS Cashier / Employee</option>
+                  <option value="admin">System Administrator</option>
+                </select>
+              </div>
+
+              {editId && (
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="blockacc"
+                    checked={isArchived}
+                    onChange={e => setIsArchived(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-gray-850 border-gray-700"
+                  />
+                  <label htmlFor="blockacc" className="text-sm text-gray-300">Archive/Block this staff account</label>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button type="submit" className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-xl transition-all">
+                Save Account
+              </button>
+              <button type="button" onClick={resetForm} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-all">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Users table */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500 text-sm">Loading staff records...</div>
+        ) : employees.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-950/40 text-gray-400 text-[10px] font-bold uppercase tracking-wider border-b border-gray-850">
+                  <th className="px-6 py-4">Employee Name</th>
+                  <th className="px-6 py-4">Email</th>
+                  <th className="px-6 py-4">Access Role</th>
+                  <th className="px-6 py-4 text-center">Status</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-850 text-xs text-gray-300">
+                {employees.map(emp => (
+                  <tr key={emp.id} className="hover:bg-gray-800/20">
+                    <td className="px-6 py-4 font-bold text-white flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center font-bold text-white text-[10px]">
+                        {emp.name.charAt(0)}
+                      </div>
+                      {emp.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-400">{emp.email}</td>
+                    <td className="px-6 py-4 font-bold uppercase text-[10px] text-gray-500 tracking-wider">
+                      {emp.role === 'admin' ? '⚙️ Admin' : '🖥️ POS Cashier'}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${emp.is_archived === 0 || emp.is_archived === false ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                        {emp.is_archived === 0 || emp.is_archived === false ? 'Active' : 'Blocked / Archived'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-3">
+                        <button onClick={() => handleEdit(emp)} className="text-amber-500 hover:text-amber-400 font-bold transition-colors">Configure</button>
+                        <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:text-red-400 font-bold transition-colors">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12 text-gray-500 text-sm">No employee records configured.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── REPORTS PANEL ─────────────────────────────────────────────────────────────
+function ReportsPanel() {
+  const [metrics, setMetrics] = useState(null);
+  const [period, setPeriod] = useState('today');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadMetrics = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await reportsAPI.dashboard({ period });
+      setMetrics(res);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch reporting data.');
+    } finally {
+      setLoading(false);
+    }
+  }, [period]);
+
+  useEffect(() => { loadMetrics(); }, [loadMetrics]);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white">Sales & Financial Reporting</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Real-time metrics, product trends, and category distribution</p>
+        </div>
+
+        {/* Period selection tabs */}
+        <div className="flex bg-gray-900 border border-gray-800 p-1.5 rounded-2xl w-fit flex-shrink-0">
+          {['today', 'this_week', 'this_month'].map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all ${
+                period === p
+                  ? 'bg-amber-500 text-gray-950 shadow-md'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {p.replace('_', ' ')}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Quick-access POS button */}
-        <div className="mt-8 p-6 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between">
-          <div>
-            <h2 className="text-white font-bold text-lg">POS Terminal</h2>
-            <p className="text-gray-400 text-sm mt-1">Launch the cashier interface to start taking orders.</p>
-          </div>
-          <button
-            onClick={() => navigate('/pos')}
-            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400
-                       hover:to-orange-400 text-gray-900 font-bold rounded-xl shadow-lg
-                       shadow-amber-500/25 transition-all hover:scale-105"
-          >
-            Open Terminal →
-          </button>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-xl px-4 py-3">
+          {error}
         </div>
-      </main>
+      )}
+
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Generating analytics metrics...</div>
+      ) : metrics ? (
+        <div className="space-y-8">
+          {/* KPI Dashboard summaries */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2 relative overflow-hidden shadow-lg">
+              <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
+              <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Gross Shift Sales</p>
+              <h2 className="text-white font-black text-3xl tabular-nums">₹{Number(metrics.summary?.total_revenue || 0).toFixed(2)}</h2>
+              <p className="text-[10px] text-gray-400 font-semibold mt-1">Sum of all Paid invoices during period</p>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2 relative overflow-hidden shadow-lg">
+              <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
+              <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Checkout Transactions</p>
+              <h2 className="text-white font-black text-3xl tabular-nums">{metrics.summary?.total_orders}</h2>
+              <p className="text-[10px] text-gray-400 font-semibold mt-1">Paid ticket volumes finalized</p>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2 relative overflow-hidden shadow-lg">
+              <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
+              <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Average Ticket Value</p>
+              <h2 className="text-white font-black text-3xl tabular-nums">₹{Number(metrics.summary?.average_order_value || 0).toFixed(2)}</h2>
+              <p className="text-[10px] text-gray-400 font-semibold mt-1">Expected ticket size per customer</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Top Products visual chart */}
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 space-y-6 shadow-lg">
+              <div>
+                <h3 className="text-white font-black text-base">Top 10 Selling Products</h3>
+                <p className="text-gray-500 text-xs">Products sorted by sales volumes</p>
+              </div>
+
+              <div className="space-y-4">
+                {metrics.charts?.top_products && metrics.charts.top_products.length > 0 ? (
+                  metrics.charts.top_products.map((p, idx) => {
+                    const maxRev = parseFloat(metrics.charts.top_products[0]?.revenue || 1);
+                    const percentage = (parseFloat(p.revenue) / maxRev) * 100;
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-white">{p.product_name} <span className="text-gray-500 text-[10px] font-bold">({p.total_quantity} sold)</span></span>
+                          <span className="text-amber-400 font-bold">₹{Number(p.revenue).toFixed(2)}</span>
+                        </div>
+                        {/* CSS Progress Bar */}
+                        <div className="w-full h-2.5 bg-gray-950 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${percentage}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 text-xs py-6 text-center">No sales logged during this period.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Top Categories visual chart */}
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 space-y-6 shadow-lg">
+              <div>
+                <h3 className="text-white font-black text-base">Sales Distribution by Category</h3>
+                <p className="text-gray-500 text-xs">Sales percentage categorized</p>
+              </div>
+
+              <div className="space-y-4">
+                {metrics.charts?.top_categories && metrics.charts.top_categories.length > 0 ? (
+                  metrics.charts.top_categories.map((c, idx) => {
+                    const totalRevenue = parseFloat(metrics.summary?.total_revenue || 1);
+                    const percentage = (parseFloat(c.revenue) / totalRevenue) * 100;
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-white">{c.category_name} <span className="text-gray-500 text-[10px] font-bold">({c.total_items} items)</span></span>
+                          <span className="text-amber-400 font-bold">{percentage.toFixed(1)}%</span>
+                        </div>
+                        {/* CSS Progress Bar */}
+                        <div className="w-full h-2.5 bg-gray-950 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full" style={{ width: `${percentage}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 text-xs py-6 text-center">No sales logged during this period.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-12 text-gray-500">Failed to render dashboard analytics.</div>
+      )}
     </div>
   );
 }

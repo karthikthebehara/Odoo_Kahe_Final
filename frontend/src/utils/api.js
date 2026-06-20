@@ -88,13 +88,14 @@ export const categoriesAPI = {
 };
 
 export const ordersAPI = {
-  list:        (params) => api.get('/api/orders', { params }),
-  get:         (id)     => api.get(`/api/orders/${id}`),
-  create:      (data)   => api.post('/api/orders', data),
-  update:      (id, d)  => api.put(`/api/orders/${id}`, d),
-  sendToKds:   (id)     => api.post(`/api/orders/${id}/send-kitchen`),
-  pay:         (id, d)  => api.post(`/api/orders/${id}/pay`, d),
-  cancel:      (id)     => api.post(`/api/orders/${id}/cancel`),
+  list:         (params)       => api.get('/api/orders', { params }),
+  get:          (id)           => api.get(`/api/orders/${id}`),
+  create:       (data)         => api.post('/api/orders', data),
+  update:       (id, d)        => api.put(`/api/orders/${id}`, d),
+  updateStatus: (id, status)   => api.put(`/api/orders/${id}/status`, { status }),
+  sendToKds:    (id)           => api.post(`/api/orders/${id}/send-kitchen`),
+  pay:          (id, d)        => api.post(`/api/orders/${id}/pay`, d),
+  cancel:       (id)           => api.post(`/api/orders/${id}/cancel`),
 };
 
 export const tablesAPI = {
@@ -111,6 +112,9 @@ export const kdsAPI = {
 export const couponsAPI = {
   validate: (code) => api.post('/api/coupons/validate', { code }),
   list:     ()     => api.get('/api/coupons'),
+  create:   (data) => api.post('/api/coupons', data),
+  update:   (id, d)=> api.put(`/api/coupons/${id}`, d),
+  delete:   (id)   => api.delete(`/api/coupons/${id}`),
 };
 
 export const customersAPI = {
@@ -118,6 +122,20 @@ export const customersAPI = {
   create: (data)   => api.post('/api/customers', data),
   update: (id, d)  => api.put(`/api/customers/${id}`, d),
   delete: (id)     => api.delete(`/api/customers/${id}`),
+};
+
+export const employeesAPI = {
+  list:   ()       => api.get('/api/employees'),
+  create: (data)   => api.post('/api/employees', data),
+  update: (id, d)  => api.put(`/api/employees/${id}`, d),
+  delete: (id)     => api.delete(`/api/employees/${id}`),
+};
+
+export const paymentMethodsAPI = {
+  list:   ()       => api.get('/api/payment-methods'),
+  create: (data)   => api.post('/api/payment-methods', data),
+  update: (id, d)  => api.put(`/api/payment-methods/${id}`, d),
+  delete: (id)     => api.delete(`/api/payment-methods/${id}`),
 };
 
 export const reportsAPI = {

@@ -191,11 +191,48 @@ const initDB = async () => {
             ]);
         }
 
+        // 8. Seed Payment Methods
+        const paymentMethods = [
+            { name: 'Cash', type: 'cash', is_enabled: true, upi_id: null },
+            { name: 'Credit/Debit Card', type: 'card', is_enabled: true, upi_id: null },
+            { name: 'UPI QR Code', type: 'upi', is_enabled: true, upi_id: 'cafe@upi' }
+        ];
+        for (const pm of paymentMethods) {
+            await pool.query(`
+                INSERT INTO payment_methods (name, type, is_enabled, upi_id)
+                SELECT * FROM (SELECT ? AS n, ? AS t, ? AS e, ? AS u) AS tmp
+                WHERE NOT EXISTS (SELECT name FROM payment_methods WHERE name = ?) LIMIT 1;
+            `, [pm.name, pm.type, pm.is_enabled, pm.upi_id, pm.name]);
+        }
+
+        // 9. Seed Customers
+        const customersSeed = [
+            { name: 'Walk-in Customer', email: 'walkin@odoocafe.com', phone: '0000000000' },
+            { name: 'John Doe', email: 'john@example.com', phone: '1234567890' },
+            { name: 'Jane Smith', email: 'jane@example.com', phone: '9876543210' }
+        ];
+        for (const cust of customersSeed) {
+            await pool.query(`
+                INSERT INTO customers (name, email, phone)
+                SELECT * FROM (SELECT ? AS n, ? AS e, ? AS p) AS tmp
+                WHERE NOT EXISTS (SELECT email FROM customers WHERE email = ?) LIMIT 1;
+            `, [cust.name, cust.email, cust.phone, cust.email]);
+        }
+
         console.log('✅ Database seeding completed successfully.');
     } catch (error) {
         console.error('❌ Database initialization failed:', error);
         throw error;
     }
 };
+
+if (require.main === module) {
+    initDB().then(() => {
+        process.exit(0);
+    }).catch(err => {
+        console.error(err);
+        process.exit(1);
+    });
+}
 
 module.exports = { initDB };

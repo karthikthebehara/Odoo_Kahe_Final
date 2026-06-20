@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../utils/api';
 
@@ -114,7 +114,7 @@ export default function Login() {
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder={role === 'admin' ? 'admin@cafe.com' : 'john@cafe.com'}
+                placeholder={role === 'admin' ? 'admin@odoocafe.com' : 'employee@odoocafe.com'}
                 className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-xl px-4 py-3
                            placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1
                            focus:ring-amber-500/50 transition-all duration-200 text-sm"
@@ -181,9 +181,17 @@ export default function Login() {
           {/* Demo hint */}
           <div className="mt-6 rounded-xl bg-gray-800/50 border border-gray-700/50 p-3 text-xs text-gray-400">
             <p className="font-semibold text-gray-300 mb-1">Demo credentials</p>
-            <p>Admin:    <span className="text-amber-400 font-mono">admin@cafe.com / admin123</span></p>
-            <p>Cashier:  <span className="text-amber-400 font-mono">john@cafe.com / cashier123</span></p>
+            <p>Admin:    <span className="text-amber-400 font-mono">admin@odoocafe.com / admin123</span></p>
+            <p>Cashier:  <span className="text-amber-400 font-mono">employee@odoocafe.com / emp123</span></p>
           </div>
+
+          {/* Signup link */}
+          <p className="text-center text-sm text-gray-500 mt-4">
+            New staff member?{' '}
+            <Link to="/signup" className="text-amber-400 hover:text-amber-300 font-semibold transition-colors">
+              Create an account
+            </Link>
+          </p>
         </div>
       </div>
     </div>

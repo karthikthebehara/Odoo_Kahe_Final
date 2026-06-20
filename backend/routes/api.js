@@ -27,6 +27,7 @@ const {
   updateOrderStatus,
   getOrders,
   getOrderById,
+  payOrder,
 } = require('../controllers/orderController');
 
 const {
@@ -48,6 +49,59 @@ const {
   updateProduct,
   deleteProduct,
 } = require('../controllers/productController');
+
+const {
+  login,
+  signup
+} = require('../controllers/authController');
+
+const {
+  getAllFloors,
+  createFloor,
+  deleteFloor,
+  getAllTables,
+  createTable,
+  updateTable,
+  deleteTable,
+} = require('../controllers/tableController');
+
+const {
+  getAllPaymentMethods,
+  createPaymentMethod,
+  updatePaymentMethod,
+  deletePaymentMethod,
+} = require('../controllers/paymentController');
+
+const {
+  getAllCustomers,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+} = require('../controllers/customerController');
+
+const {
+  getAllPromotions,
+  createPromotion,
+  updatePromotion,
+  deletePromotion,
+  validateCoupon,
+} = require('../controllers/couponController');
+
+const {
+  getAllEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+} = require('../controllers/employeeController');
+
+const {
+  getActiveSession,
+  openSession,
+  closeSession,
+  getSessionSummary,
+} = require('../controllers/sessionController');
+
+const { verifyToken } = require('../middleware/auth');
 
 // ─── Order Routes ─────────────────────────────────────────────────────────────
 
@@ -85,6 +139,12 @@ router.get('/orders/:id', getOrderById);
  */
 router.put('/orders/:id/status', updateOrderStatus);
 
+/**
+ * POST /api/orders/:id/pay
+ * Register payment for an order and free up the table.
+ */
+router.post('/orders/:id/pay', payOrder);
+
 // ─── Reporting Routes ─────────────────────────────────────────────────────────
 
 /**
@@ -106,5 +166,66 @@ router.get('/products/:id', getProductById);
 router.post('/products', createProduct);
 router.put('/products/:id', updateProduct);
 router.delete('/products/:id', deleteProduct);
+
+// ─── Floor & Table Routes ─────────────────────────────────────────────────────
+router.get('/floors', getAllFloors);
+router.post('/floors', createFloor);
+router.delete('/floors/:id', deleteFloor);
+
+router.get('/tables', getAllTables);
+router.post('/tables', createTable);
+router.put('/tables/:id', updateTable);
+router.delete('/tables/:id', deleteTable);
+
+// ─── Payment Methods Routes ───────────────────────────────────────────────────
+router.get('/payment-methods', getAllPaymentMethods);
+router.post('/payment-methods', createPaymentMethod);
+router.put('/payment-methods/:id', updatePaymentMethod);
+router.delete('/payment-methods/:id', deletePaymentMethod);
+
+// support /payments for utility APIs too
+router.get('/payments', getAllPaymentMethods);
+router.post('/payments', createPaymentMethod);
+router.put('/payments/:id', updatePaymentMethod);
+router.delete('/payments/:id', deletePaymentMethod);
+
+// ─── Customer Routes ──────────────────────────────────────────────────────────
+router.get('/customers', getAllCustomers);
+router.post('/customers', createCustomer);
+router.put('/customers/:id', updateCustomer);
+router.delete('/customers/:id', deleteCustomer);
+
+// ─── Coupons & Promotions Routes ──────────────────────────────────────────────
+router.get('/coupons', getAllPromotions);
+router.post('/coupons', createPromotion);
+router.put('/coupons/:id', updatePromotion);
+router.delete('/coupons/:id', deletePromotion);
+router.post('/coupons/validate', validateCoupon);
+
+router.get('/promotions', getAllPromotions);
+router.post('/promotions', createPromotion);
+router.put('/promotions/:id', updatePromotion);
+router.delete('/promotions/:id', deletePromotion);
+
+// ─── Employee Management Routes ───────────────────────────────────────────────
+router.get('/employees', getAllEmployees);
+router.post('/employees', createEmployee);
+router.put('/employees/:id', updateEmployee);
+router.delete('/employees/:id', deleteEmployee);
+
+// ─── Session Management Routes ────────────────────────────────────────────────
+router.get('/sessions/active', verifyToken, getActiveSession);
+router.post('/sessions', verifyToken, openSession);
+router.put('/sessions/:id/close', verifyToken, closeSession);
+router.get('/sessions/:id/summary', verifyToken, getSessionSummary);
+
+// ─── Auth Routes ──────────────────────────────────────────────────────────────
+router.post('/auth/login', login);
+router.post('/auth/signup', signup);
+
+// Check token status and details
+router.get('/auth/me', verifyToken, (req, res) => {
+  res.status(200).json({ success: true, data: req.user });
+});
 
 module.exports = router;

@@ -19,7 +19,9 @@
  */
 
 import React, { useReducer, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { categoriesAPI, productsAPI, ordersAPI } from '../utils/api';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api, { categoriesAPI, productsAPI, ordersAPI, tablesAPI, couponsAPI, customersAPI } from '../utils/api';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITY
@@ -108,48 +110,6 @@ const Icons = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MOCK DATA
-// ═══════════════════════════════════════════════════════════════════════════════
-// Dynamic data fetched from API
-
-const FLOORS = [
-  {
-    id: 1, name: 'Ground Floor',
-    tables: [
-      { id: 1,  number: 'T1',  seats: 2, status: 'free'   },
-      { id: 2,  number: 'T2',  seats: 4, status: 'active' },
-      { id: 3,  number: 'T3',  seats: 4, status: 'free'   },
-      { id: 4,  number: 'T4',  seats: 6, status: 'active' },
-      { id: 5,  number: 'T5',  seats: 2, status: 'free'   },
-      { id: 6,  number: 'T6',  seats: 4, status: 'free'   },
-    ],
-  },
-  {
-    id: 2, name: 'First Floor',
-    tables: [
-      { id: 7,  number: 'T7',  seats: 4, status: 'free'   },
-      { id: 8,  number: 'T8',  seats: 6, status: 'active' },
-      { id: 9,  number: 'T9',  seats: 8, status: 'free'   },
-      { id: 10, number: 'T10', seats: 2, status: 'free'   },
-    ],
-  },
-  {
-    id: 3, name: 'Terrace',
-    tables: [
-      { id: 11, number: 'T11', seats: 4, status: 'free'   },
-      { id: 12, number: 'T12', seats: 4, status: 'active' },
-      { id: 13, number: 'T13', seats: 6, status: 'free'   },
-    ],
-  },
-];
-
-const COUPONS = {
-  WELCOME10: { code: 'WELCOME10', type: 'percent', value: 10, label: '10% off' },
-  FLAT50:    { code: 'FLAT50',    type: 'fixed',   value: 50, label: '₹50 off' },
-  SAVE20:    { code: 'SAVE20',    type: 'percent', value: 20, label: '20% off' },
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // CART REDUCER
 // ═══════════════════════════════════════════════════════════════════════════════
 const computeTotals = (items, discount) => {
@@ -165,6 +125,8 @@ const cartInit = {
   coupon: null,
   tableId: null,
   tableLabel: '',
+  customerId: null,
+  customerName: '',
   subtotal: 0,
   tax: 0,
   total: 0,
@@ -211,6 +173,9 @@ function cartReducer(state, action) {
 
     case 'SET_TABLE':
       return { ...state, tableId: action.tableId, tableLabel: action.label };
+
+    case 'SET_CUSTOMER':
+      return { ...state, customerId: action.customerId, customerName: action.name };
 
     case 'CLEAR':
       return { ...cartInit };
@@ -370,7 +335,7 @@ function TableModal({ floors, onSelect, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+        className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -380,7 +345,7 @@ function TableModal({ floors, onSelect, onClose }) {
               <Icons.Table /> Select a Table
             </h2>
             <p className="text-gray-500 text-sm mt-0.5">
-              {floor.tables.filter(t => t.status === 'free').length} tables available on {floor.name}
+              {floor ? floor.tables.filter(t => t.status === 'free').length : 0} tables available on {floor ? floor.name : ''}
             </p>
           </div>
           <button
@@ -393,14 +358,14 @@ function TableModal({ floors, onSelect, onClose }) {
         </div>
 
         {/* Floor Tabs */}
-        <div className="flex gap-2 px-6 pt-5">
+        <div className="flex gap-2 px-6 pt-5 overflow-x-auto">
           {floors.map(f => (
             <button
               key={f.id}
               id={`floor-tab-${f.id}`}
               onClick={() => setActiveFloorId(f.id)}
               className={[
-                'px-5 py-2 rounded-xl text-sm font-semibold transition-all',
+                'px-5 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap',
                 f.id === activeFloorId
                   ? 'bg-amber-500 text-gray-900 shadow-lg shadow-amber-500/25'
                   : 'bg-gray-800 text-gray-400 hover:text-white',
@@ -412,8 +377,8 @@ function TableModal({ floors, onSelect, onClose }) {
         </div>
 
         {/* Tables Grid */}
-        <div className="p-6 grid grid-cols-3 sm:grid-cols-4 gap-3">
-          {(floor?.tables || []).map(t => {
+        <div className="p-6 grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto">
+          {floor ? (floor.tables || []).map(t => {
             const isActive = t.status === 'active';
             return (
               <button
@@ -443,7 +408,11 @@ function TableModal({ floors, onSelect, onClose }) {
                 </span>
               </button>
             );
-          })}
+          }) : (
+            <div className="col-span-4 text-center py-8 text-gray-500">
+              No tables configured for this floor.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -459,16 +428,21 @@ function DiscountModal({ activeCoupon, onApply, onRemove, onClose }) {
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const validate = () => {
+  const validate = async () => {
     const c = code.trim().toUpperCase();
     if (!c) { setError('Please enter a coupon code.'); return; }
-    const found = COUPONS[c];
-    if (!found) {
-      setError(`"${c}" is not a valid coupon.`);
-      setResult(null);
-    } else {
+    try {
+      const promo = await couponsAPI.validate(c);
       setError('');
-      setResult(found);
+      setResult({
+        code: promo.coupon_code,
+        type: promo.discount_type === 'percentage' ? 'percent' : 'fixed',
+        value: parseFloat(promo.value),
+        label: promo.discount_type === 'percentage' ? `${promo.value}% off` : `₹${promo.value} off`
+      });
+    } catch (err) {
+      setError(err.message || 'Invalid or expired coupon code.');
+      setResult(null);
     }
   };
 
@@ -482,7 +456,7 @@ function DiscountModal({ activeCoupon, onApply, onRemove, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-md p-6"
+        className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -501,10 +475,9 @@ function DiscountModal({ activeCoupon, onApply, onRemove, onClose }) {
 
         {/* Active coupon pill */}
         {activeCoupon && (
-          <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-4 py-3 mb-4">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <Icons.Check />
-              <span className="font-semibold text-sm">{activeCoupon.code} — {activeCoupon.label}</span>
+          <div className="mb-4 flex items-center justify-between bg-emerald-500/10 border border-emerald-500/25 rounded-2xl px-4 py-3">
+            <div className="text-emerald-400 text-xs font-semibold">
+              Active: {activeCoupon.code} ({activeCoupon.label})
             </div>
             <button
               id="remove-coupon-btn"
@@ -580,6 +553,9 @@ function DiscountModal({ activeCoupon, onApply, onRemove, onClose }) {
 // MAIN COMPONENT — PosTerminal
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function PosTerminal() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
   // ── Local State ─────────────────────────────────────────────────────────────
   const [cart, dispatch]       = useReducer(cartReducer, cartInit);
 
@@ -589,29 +565,87 @@ export default function PosTerminal() {
   const [showDiscount, setShowDiscount] = useState(false);
   const [sendState,   setSendState]     = useState('idle'); // 'idle' | 'sending' | 'sent'
 
+  // Modal control states
+  const [showCustomers, setShowCustomers] = useState(false);
+  const [showOrders, setShowOrders]       = useState(false);
+  const [showPayment, setShowPayment]     = useState(false);
+  const [paymentOrder, setPaymentOrder]   = useState(null);
+  const [showReceipt, setShowReceipt]     = useState(false);
+  const [receiptOrder, setReceiptOrder]   = useState(null);
+  const [showUserMenu, setShowUserMenu]   = useState(false);
+  const [showSessionOpenModal, setShowSessionOpenModal]   = useState(false);
+  const [showSessionCloseModal, setShowSessionCloseModal] = useState(false);
+
   // Dynamic API state
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
+  const [dbFloors, setDbFloors]     = useState([]);
+  const [activeSession, setActiveSession] = useState(null);
+
+  // ── Redirect if not logged in ──
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
+  // ── Fetch active session ──
+  const fetchSession = useCallback(async () => {
+    try {
+      const active = await api.get('/api/sessions/active');
+      if (active) {
+        setActiveSession(active);
+        setShowSessionOpenModal(false);
+      } else {
+        setActiveSession(null);
+        setShowSessionOpenModal(true);
+      }
+    } catch (err) {
+      console.error('Failed to check active session', err);
+      setShowSessionOpenModal(true);
+    }
+  }, []);
+
+  // ── Fetch Catalog & Floors/Tables ──
+  const fetchCatalogAndTables = useCallback(async () => {
+    try {
+      const [cats, prods, floorsData, tablesData] = await Promise.all([
+        categoriesAPI.list(),
+        productsAPI.list(),
+        tablesAPI.floors(),
+        tablesAPI.list(),
+      ]);
+      setCategories(cats || []);
+      setProducts(prods || []);
+
+      // Group tables by floor
+      const mappedFloors = (floorsData || []).map(f => {
+        const floorTables = (tablesData || [])
+          .filter(t => t.floor_id === f.id)
+          .map(t => ({
+            id: t.id,
+            number: t.table_number,
+            seats: t.seats,
+            status: t.status === 'available' ? 'free' : 'active'
+          }));
+        return {
+          id: f.id,
+          name: f.name,
+          tables: floorTables
+        };
+      });
+      setDbFloors(mappedFloors);
+    } catch (err) {
+      console.error('Failed to load catalog and tables', err);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    async function fetchData() {
-      try {
-        const [cats, prods] = await Promise.all([
-          categoriesAPI.list(),
-          productsAPI.list()
-        ]);
-        if (mounted) {
-          setCategories(cats || []);
-          setProducts(prods || []);
-        }
-      } catch (err) {
-        console.error('Failed to load catalog', err);
-      }
+    if (user) {
+      fetchSession();
+      fetchCatalogAndTables();
     }
-    fetchData();
-    return () => { mounted = false; };
-  }, []);
+  }, [user, fetchSession, fetchCatalogAndTables]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const catMap = useMemo(
@@ -649,24 +683,74 @@ export default function PosTerminal() {
     setSendState('sending');
     try {
       await ordersAPI.create({
+        session_id: activeSession?.id || 1,
         table_id: cart.tableId,
-        customer_name: '',
-        customer_phone: '',
+        customer_id: cart.customerId || null,
+        coupon_code: cart.coupon?.coupon_code || null,
         items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty }))
       });
       setSendState('sent');
       dispatch({ type: 'CLEAR' });
+      fetchCatalogAndTables();
       setTimeout(() => setSendState('idle'), 2800);
     } catch (err) {
       console.error('Failed to send order', err);
+      alert('Failed to send order: ' + (err.message || 'unknown error'));
       setSendState('idle');
     }
+  };
+
+  const handleProceedToPayment = async () => {
+    if (cart.items.length === 0) return;
+    try {
+      const orderRes = await ordersAPI.create({
+        session_id: activeSession?.id || 1,
+        table_id: cart.tableId,
+        customer_id: cart.customerId || null,
+        coupon_code: cart.coupon?.coupon_code || null,
+        items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty }))
+      });
+      
+      setPaymentOrder({
+        id: orderRes.orderId || orderRes.order?.id,
+        total_amount: orderRes.total || orderRes.order?.total_amount || cart.total,
+        customer_id: cart.customerId,
+        customerName: cart.customerName,
+        tableLabel: cart.tableLabel,
+        order_number: orderRes.order?.order_number
+      });
+      setShowPayment(true);
+    } catch (err) {
+      console.error('Failed to proceed to payment', err);
+      alert('Failed to initialize payment: ' + (err.message || 'unknown error'));
+    }
+  };
+
+  const handlePaymentSuccess = (paidOrder) => {
+    dispatch({ type: 'CLEAR' });
+    setPaymentOrder(null);
+    setShowPayment(false);
+    
+    // Open receipt modal
+    setReceiptOrder(paidOrder);
+    setShowReceipt(true);
+    
+    // Re-fetch catalog tables status
+    fetchCatalogAndTables();
   };
 
   // ── Keyboard shortcut: Escape to close modals ────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') { setShowTable(false); setShowDiscount(false); }
+      if (e.key === 'Escape') { 
+        setShowTable(false); 
+        setShowDiscount(false);
+        setShowCustomers(false);
+        setShowOrders(false);
+        setShowPayment(false);
+        setShowReceipt(false);
+        setShowUserMenu(false);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -703,8 +787,19 @@ export default function PosTerminal() {
           >
             <Icons.Table /> Table View
           </button>
-          <button className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
-            Orders
+          <button
+            id="nav-orders-btn"
+            onClick={() => setShowOrders(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+          >
+            📜 Orders
+          </button>
+          <button
+            id="nav-customers-btn"
+            onClick={() => setShowCustomers(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+          >
+            👥 Customers
           </button>
         </nav>
 
@@ -731,9 +826,44 @@ export default function PosTerminal() {
           </div>
         )}
 
-        {/* Session indicator */}
-        <div className="ml-1 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-md">
-          <span className="text-white text-xs font-bold">C</span>
+        {/* User Dropdown Menu */}
+        <div className="relative">
+          <button
+            id="nav-user-menu"
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="ml-1 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-md hover:scale-105 transition-transform"
+          >
+            <span className="text-white text-xs font-bold">{user?.name?.charAt(0) || 'C'}</span>
+          </button>
+          
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl shadow-xl py-2 z-50">
+              <div className="px-4 py-2 border-b border-gray-800">
+                <p className="text-white font-semibold text-sm truncate">{user?.name}</p>
+                <p className="text-gray-500 text-xs truncate capitalize">{user?.role}</p>
+              </div>
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => { setShowUserMenu(false); navigate('/admin'); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                >
+                  ⚙️ Admin Dashboard
+                </button>
+              )}
+              <button
+                onClick={() => { setShowUserMenu(false); setShowSessionCloseModal(true); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
+              >
+                🔒 Close Shift / Session
+              </button>
+              <button
+                onClick={() => { setShowUserMenu(false); logout(); navigate('/login'); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                🚪 Log Out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -853,6 +983,22 @@ export default function PosTerminal() {
             )}
           </div>
 
+          {/* Linked Customer Info */}
+          {cart.customerName && (
+            <div className="flex-shrink-0 px-5 py-2 border-t border-gray-800 flex items-center justify-between text-xs text-emerald-400 bg-emerald-500/5">
+              <span className="truncate flex items-center gap-1.5 font-medium">
+                👤 Customer: <span className="font-semibold text-white">{cart.customerName}</span>
+              </span>
+              <button
+                id="remove-customer-btn"
+                onClick={() => dispatch({ type: 'SET_CUSTOMER', customerId: null, name: '' })}
+                className="text-red-400 hover:text-red-300 font-bold px-1.5"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           {/* ── Primary Action Buttons ───────────────────────────────────────── */}
           <div className="flex-shrink-0 px-5 py-3 border-t border-gray-800 flex gap-2">
             <button
@@ -936,6 +1082,7 @@ export default function PosTerminal() {
             {cart.items.length > 0 && (
               <button
                 id="proceed-payment-btn"
+                onClick={handleProceedToPayment}
                 className="w-full py-3 rounded-2xl font-semibold text-sm bg-gray-800/70 hover:bg-gray-700 text-white border border-gray-700 hover:border-gray-500 transition-all flex items-center justify-center gap-2"
               >
                 Proceed to Payment →
@@ -945,12 +1092,9 @@ export default function PosTerminal() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          MODALS
-      ══════════════════════════════════════════════════════════════════════ */}
       {showTable && (
         <TableModal
-          floors={FLOORS}
+          floors={dbFloors}
           onSelect={handleTableSelect}
           onClose={() => setShowTable(false)}
         />
@@ -964,6 +1108,909 @@ export default function PosTerminal() {
           onClose={() => setShowDiscount(false)}
         />
       )}
+
+      {showCustomers && (
+        <CustomersModal
+          onSelect={(c) => { dispatch({ type: 'SET_CUSTOMER', customerId: c.id, name: c.name }); setShowCustomers(false); }}
+          onClose={() => setShowCustomers(false)}
+        />
+      )}
+
+      {showOrders && (
+        <OrdersModal
+          onPay={(order) => {
+            setPaymentOrder({
+              id: order.id,
+              total_amount: order.total_amount,
+              customer_id: order.customer_id,
+              customerName: order.customer_name || '',
+              tableLabel: order.table_label || `Order #${order.id}`,
+              order_number: order.order_number
+            });
+            setShowOrders(false);
+            setShowPayment(true);
+          }}
+          onClose={() => setShowOrders(false)}
+        />
+      )}
+
+      {showPayment && paymentOrder && (
+        <PaymentModal
+          order={paymentOrder}
+          onSuccess={handlePaymentSuccess}
+          onClose={() => setShowPayment(false)}
+        />
+      )}
+
+      {showReceipt && receiptOrder && (
+        <ReceiptModal
+          order={receiptOrder}
+          onClose={() => { setShowReceipt(false); setReceiptOrder(null); }}
+        />
+      )}
+
+      {showSessionOpenModal && (
+        <SessionOpenModal
+          user={user}
+          onSuccess={(session) => {
+            setActiveSession(session);
+            setShowSessionOpenModal(false);
+          }}
+        />
+      )}
+
+      {showSessionCloseModal && activeSession && (
+        <SessionCloseModal
+          session={activeSession}
+          onSuccess={() => {
+            setActiveSession(null);
+            setShowSessionCloseModal(false);
+            logout();
+            navigate('/login');
+          }}
+          onClose={() => setShowSessionCloseModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW SHIFT, CUSTOMER, ORDERS & PAYMENT SUB-COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function SessionOpenModal({ user, onSuccess }) {
+  const [openingBalance, setOpeningBalance] = useState('1000.00');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleOpen = async () => {
+    const bal = parseFloat(openingBalance);
+    if (isNaN(bal) || bal < 0) {
+      setError('Please enter a valid opening balance.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.post('/api/sessions', {
+        user_id: user.id,
+        opening_balance: bal
+      });
+      onSuccess(res);
+    } catch (err) {
+      setError(err.message || 'Failed to open session.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-md p-8 text-center space-y-6">
+        <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center text-3xl mx-auto">
+          🔓
+        </div>
+        <div>
+          <h2 className="text-white font-extrabold text-2xl">Open POS Shift / Session</h2>
+          <p className="text-gray-400 text-sm mt-1.5">
+            Welcome back, {user?.name}. Please enter your opening cash balance to start.
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 text-left">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-2 text-left">
+          <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Opening Cash (₹)</label>
+          <input
+            type="number"
+            value={openingBalance}
+            onChange={e => setOpeningBalance(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 text-white rounded-2xl px-5 py-4 font-bold text-lg focus:outline-none focus:border-amber-500 transition-colors"
+          />
+        </div>
+
+        <button
+          onClick={handleOpen}
+          disabled={loading}
+          className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
+        >
+          {loading ? 'Opening Shift...' : 'Open Shift & Start Selling'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SessionCloseModal({ session, onSuccess, onClose }) {
+  const [summary, setSummary] = useState(null);
+  const [closingBalance, setClosingBalance] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadSummary() {
+      try {
+        const res = await api.get(`/api/sessions/${session.id}/summary`);
+        setSummary(res);
+        setClosingBalance(res.expected_closing_cash.toFixed(2));
+      } catch (err) {
+        setError('Failed to fetch session summary: ' + err.message);
+      }
+    }
+    loadSummary();
+  }, [session.id]);
+
+  const handleClose = async () => {
+    const bal = parseFloat(closingBalance);
+    if (isNaN(bal) || bal < 0) {
+      setError('Please enter a valid closing balance.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await api.put(`/api/sessions/${session.id}/close`, {
+        closing_balance: bal
+      });
+      onSuccess();
+    } catch (err) {
+      setError(err.message || 'Failed to close session.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800">
+          <h2 className="text-white font-bold text-lg flex items-center gap-2">
+            🔒 Close Session & Shift Summary
+          </h2>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+            <Icons.X />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-xl px-4 py-3">
+              {error}
+            </div>
+          )}
+
+          {summary ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-800/40 border border-gray-800 p-4 rounded-2xl">
+                  <p className="text-gray-500 text-xs">Opening Cash Balance</p>
+                  <p className="text-white font-extrabold text-xl mt-1">{fmt(summary.opening_balance)}</p>
+                </div>
+                <div className="bg-gray-800/40 border border-gray-800 p-4 rounded-2xl">
+                  <p className="text-gray-500 text-xs">Total Sales (All Types)</p>
+                  <p className="text-amber-400 font-extrabold text-xl mt-1">{fmt(summary.total_sales)}</p>
+                </div>
+              </div>
+
+              {/* Payment details list */}
+              <div className="bg-gray-950 rounded-2xl p-4 border border-gray-800 space-y-2.5 text-sm">
+                <div className="flex justify-between text-gray-400">
+                  <span>Cash Sales (+ expected in drawer)</span>
+                  <span className="text-white font-semibold">{fmt(summary.cash_sales)}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Card Sales</span>
+                  <span className="text-white font-semibold">{fmt(summary.card_sales)}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>UPI QR Sales</span>
+                  <span className="text-white font-semibold">{fmt(summary.upi_sales)}</span>
+                </div>
+                <div className="border-t border-gray-800 pt-2.5 flex justify-between font-bold text-white">
+                  <span>Expected Closing Cash</span>
+                  <span className="text-amber-400">{fmt(summary.expected_closing_cash)}</span>
+                </div>
+              </div>
+
+              {/* Input for actual cash */}
+              <div className="space-y-2">
+                <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Actual Closing Cash in Drawer (₹)</label>
+                <input
+                  type="number"
+                  value={closingBalance}
+                  onChange={e => setClosingBalance(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-2xl px-5 py-4 font-bold text-lg focus:outline-none focus:border-amber-500 transition-colors"
+                />
+              </div>
+
+              {closingBalance !== '' && (
+                <div className="flex items-center justify-between text-sm px-4 py-3 bg-gray-950 rounded-xl border border-gray-800">
+                  <span className="text-gray-400">Drawer Discrepancy:</span>
+                  <span className={`font-extrabold ${parseFloat(closingBalance) - summary.expected_closing_cash >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {fmt(parseFloat(closingBalance) - summary.expected_closing_cash)}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Loading shift details...
+            </div>
+          )}
+
+          <button
+            onClick={handleClose}
+            disabled={loading || !summary}
+            className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white font-bold rounded-2xl shadow-lg shadow-red-500/10 transition-all hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
+          >
+            {loading ? 'Closing Shift...' : 'Close Session & Log Out'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomersModal({ onSelect, onClose }) {
+  const [customers, setCustomers] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadCustomers = useCallback(async (query = '') => {
+    setLoading(true);
+    try {
+      const res = await customersAPI.list(query);
+      setCustomers(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  const handleSearch = (val) => {
+    setSearch(val);
+    loadCustomers(val);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name) { setError('Name is required.'); return; }
+    setError('');
+    try {
+      await customersAPI.create({ name, email, phone });
+      loadCustomers(search);
+      setName('');
+      setEmail('');
+      setPhone('');
+      setFormOpen(false);
+    } catch (err) {
+      setError(err.message || 'Failed to save customer.');
+    }
+  };
+
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this customer?')) return;
+    try {
+      await customersAPI.delete(id);
+      loadCustomers(search);
+    } catch (err) {
+      alert(err.message || 'Failed to delete.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800 flex-shrink-0">
+          <div>
+            <h2 className="text-white font-bold text-lg flex items-center gap-2">
+              👥 Customers Directory
+            </h2>
+            <p className="text-gray-500 text-sm mt-0.5">Manage customers and link them to orders</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFormOpen(!formOpen)}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-900 text-xs font-bold rounded-xl transition-colors"
+            >
+              {formOpen ? 'Cancel' : '+ Add Customer'}
+            </button>
+            <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+              <Icons.X />
+            </button>
+          </div>
+        </div>
+
+        {/* Add/Edit Form Overlay */}
+        {formOpen && (
+          <form onSubmit={handleSave} className="bg-gray-950 p-6 border-b border-gray-800 space-y-4 flex-shrink-0">
+            <h3 className="text-white font-bold text-sm">Add New Customer</h3>
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                type="text"
+                placeholder="Full Name (Required)"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="bg-gray-900 border border-gray-800 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="bg-gray-900 border border-gray-800 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <input
+                type="text"
+                placeholder="Phone Number"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                className="bg-gray-900 border border-gray-800 text-white rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
+            <button type="submit" className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold rounded-xl transition-colors">
+              Save Customer Details
+            </button>
+          </form>
+        )}
+
+        {/* Search Input */}
+        <div className="p-4 border-b border-gray-800 flex-shrink-0">
+          <input
+            type="text"
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+            placeholder="Search by name, email, or phone number..."
+            className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 transition-colors placeholder-gray-600"
+          />
+        </div>
+
+        {/* Customers List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Searching customers...</div>
+          ) : customers.length > 0 ? (
+            customers.map(c => (
+              <div
+                key={c.id}
+                onClick={() => onSelect(c)}
+                className="flex items-center justify-between p-4 bg-gray-800/40 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-2xl cursor-pointer transition-all group"
+              >
+                <div>
+                  <h4 className="text-white font-semibold text-sm">{c.name}</h4>
+                  <div className="flex gap-4 text-gray-400 text-xs mt-1">
+                    {c.email && <span>📧 {c.email}</span>}
+                    {c.phone && <span>📞 {c.phone}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-amber-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                    Link Order →
+                  </span>
+                  <button
+                    onClick={(e) => handleDelete(c.id, e)}
+                    className="text-gray-600 hover:text-red-400 p-1.5 transition-colors"
+                  >
+                    <Icons.Trash />
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">No customers found.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrdersModal({ onPay, onClose }) {
+  const [orders, setOrders] = useState([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await ordersAPI.list();
+      setOrders(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  const filteredOrders = useMemo(() => {
+    const s = search.toLowerCase().trim();
+    return orders.filter(o => {
+      const matchNum = !s || (o.order_number || '').toLowerCase().includes(s) || o.id.toString().includes(s);
+      const matchStatus = !statusFilter || o.status === statusFilter;
+      return matchNum && matchStatus;
+    });
+  }, [orders, search, statusFilter]);
+
+  const handleCancelOrder = async (id) => {
+    if (!window.confirm('Cancel this order?')) return;
+    try {
+      await ordersAPI.cancel(id);
+      loadOrders();
+      setSelectedOrder(null);
+    } catch (err) {
+      alert('Failed to cancel order: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-[80vh] animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        
+        {/* Left Side: Order List */}
+        <div className="w-full md:w-1/2 border-r border-gray-800 flex flex-col h-full overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-800 flex-shrink-0 flex items-center justify-between">
+            <h2 className="text-white font-bold text-lg flex items-center gap-2">
+              📜 Active Shift Orders
+            </h2>
+            <button onClick={onClose} className="md:hidden w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+              <Icons.X />
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="p-4 border-b border-gray-800 space-y-2 flex-shrink-0 bg-gray-950/20">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by order number..."
+              className="w-full bg-gray-800 border border-gray-700 text-white text-xs rounded-xl px-4 py-2.5 focus:outline-none focus:border-amber-500 transition-colors placeholder-gray-650 font-mono"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStatusFilter('')}
+                className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === '' ? 'bg-amber-500 text-gray-900' : 'bg-gray-800 text-gray-400'}`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setStatusFilter('draft')}
+                className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === 'draft' ? 'bg-amber-500 text-gray-900' : 'bg-gray-800 text-gray-400'}`}
+              >
+                Draft
+              </button>
+              <button
+                onClick={() => setStatusFilter('pending')}
+                className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === 'pending' ? 'bg-amber-500 text-gray-900' : 'bg-gray-800 text-gray-400'}`}
+              >
+                Kitchen
+              </button>
+            </div>
+          </div>
+
+          {/* Orders Scroll Container */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {loading ? (
+              <div className="text-center py-8 text-gray-500">Retrieving active orders...</div>
+            ) : filteredOrders.length > 0 ? (
+              filteredOrders.map(o => (
+                <div
+                  key={o.id}
+                  onClick={() => setSelectedOrder(o)}
+                  className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedOrder?.id === o.id ? 'border-amber-500 bg-amber-500/5' : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-bold font-mono text-sm">{o.order_number || `Order #${o.id}`}</span>
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${o.status === 'draft' ? 'bg-gray-700 text-gray-300' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
+                      {o.status === 'draft' ? 'Draft' : 'KDS Pending'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
+                    <span>{new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-amber-400 font-bold">{fmt(o.total_amount)}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">No active orders.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side: Details View */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-950/40">
+          <div className="px-6 py-5 border-b border-gray-800 flex-shrink-0 flex items-center justify-between">
+            <h3 className="text-white font-bold text-lg">Order Details</h3>
+            <button onClick={onClose} className="hidden md:flex w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+              <Icons.X />
+            </button>
+          </div>
+
+          {selectedOrder ? (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                <div className="space-y-1">
+                  <p className="text-white font-black font-mono text-xl">{selectedOrder.order_number || `Order #${selectedOrder.id}`}</p>
+                  <p className="text-gray-500 text-xs">Placed on {new Date(selectedOrder.created_at).toLocaleString()}</p>
+                </div>
+
+                {/* Items detail list */}
+                <div className="space-y-2 border-t border-b border-gray-800 py-4">
+                  {(selectedOrder.items || []).map(item => (
+                    <div key={item.id} className="flex justify-between items-center text-sm text-gray-300">
+                      <div>
+                        <span className="font-semibold text-white">{item.product_name}</span>
+                        <span className="text-gray-500 text-xs ml-2">×{item.quantity}</span>
+                      </div>
+                      <span className="font-mono text-amber-400">{fmt(item.subtotal)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Totals details */}
+                <div className="space-y-1.5 text-sm text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="text-white font-medium">{fmt(selectedOrder.subtotal)}</span>
+                  </div>
+                  {parseFloat(selectedOrder.discount_amount) > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>Discount</span>
+                      <span>−{fmt(selectedOrder.discount_amount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>GST / Tax</span>
+                    <span className="text-white font-medium">{fmt(selectedOrder.tax_amount)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-white text-base border-t border-gray-800 pt-3 mt-2">
+                    <span>Grand Total</span>
+                    <span className="text-amber-400 font-extrabold">{fmt(selectedOrder.total_amount)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action pane footer */}
+              <div className="p-6 border-t border-gray-800 bg-gray-900 flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => onPay(selectedOrder)}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-xs font-semibold"
+                >
+                  💳 Proceed to Pay
+                </button>
+                <button
+                  onClick={() => handleCancelOrder(selectedOrder.id)}
+                  className="px-5 py-3.5 bg-gray-800 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-500/25 font-semibold rounded-2xl transition-colors text-xs"
+                >
+                  Cancel Order
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8 text-center">
+              <span className="text-4xl mb-2">👈</span>
+              <p className="font-semibold text-sm">Select an active order from the list to manage.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentModal({ order, onSuccess, onClose }) {
+  const [method, setMethod] = useState('cash'); // 'cash' | 'card' | 'upi'
+  const [ref, setRef] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [enabledMethods, setEnabledMethods] = useState([]);
+
+  useEffect(() => {
+    async function loadMethods() {
+      try {
+        const res = await api.get('/api/payment-methods');
+        const active = (res || []).filter(pm => pm.is_enabled);
+        setEnabledMethods(active);
+        if (active.length > 0) {
+          setMethod(active[0].type);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadMethods();
+  }, []);
+
+  const handlePay = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const pmObj = enabledMethods.find(pm => pm.type === method) || { name: method };
+      await ordersAPI.pay(order.id, {
+        payment_method: pmObj.name,
+        payment_ref: ref || null,
+        customer_id: order.customer_id || null
+      });
+      
+      onSuccess({
+        ...order,
+        payment_method: pmObj.name,
+        payment_ref: ref || 'PAID',
+        status: 'paid',
+        paid_at: new Date().toLocaleString()
+      });
+    } catch (err) {
+      setError(err.message || 'Payment processing failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedMethodObj = enabledMethods.find(pm => pm.type === method);
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800">
+          <h2 className="text-white font-bold text-lg flex items-center gap-2">
+            💳 Process Order Payment
+          </h2>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+            <Icons.X />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-xl px-4 py-3">
+              {error}
+            </div>
+          )}
+
+          {/* Amount Box */}
+          <div className="bg-gray-950 border border-gray-850 p-6 rounded-2xl text-center space-y-1">
+            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Amount Due</p>
+            <p className="text-amber-400 font-black text-3xl tabular-nums">{fmt(order.total_amount)}</p>
+            {order.order_number && <p className="text-gray-600 font-mono text-[10px] pt-1">{order.order_number}</p>}
+          </div>
+
+          {/* Select Method */}
+          <div className="space-y-2">
+            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Select Payment Method</label>
+            <div className="grid grid-cols-3 gap-2">
+              {enabledMethods.map(pm => (
+                <button
+                  key={pm.id}
+                  onClick={() => { setMethod(pm.type); setRef(''); }}
+                  className={`p-4 border rounded-2xl text-center transition-all ${method === pm.type ? 'border-amber-500 bg-amber-500/10 text-white font-bold' : 'border-gray-800 bg-gray-800/30 text-gray-400 hover:text-white'}`}
+                >
+                  <span className="text-2xl block mb-1">
+                    {pm.type === 'cash' ? '💵' : pm.type === 'card' ? '💳' : '📱'}
+                  </span>
+                  <span className="text-[10px] leading-tight block">{pm.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Dynamic details for UPI / Card / Cash */}
+          {method === 'upi' && (
+            <div className="bg-gray-950 border border-gray-850 p-4 rounded-2xl text-center space-y-3 animate-in fade-in duration-200">
+              <p className="text-xs text-gray-400">Scan to Pay via UPI App</p>
+              <div className="w-32 h-32 bg-white p-2.5 rounded-xl mx-auto shadow-md flex items-center justify-center">
+                <div className="w-full h-full bg-slate-900 rounded-md relative flex flex-wrap p-0.5 overflow-hidden">
+                  {Array.from({ length: 144 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-[8.33%] h-[8.33%] ${(i % 3 === 0 || i % 7 === 2 || (i > 10 && i < 20) || (i > 80 && i < 110)) ? 'bg-amber-400' : 'bg-slate-950'}`}
+                    />
+                  ))}
+                  <div className="absolute top-1 left-1 w-6 h-6 bg-slate-950 border-[3px] border-amber-400 rounded flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-amber-400" />
+                  </div>
+                  <div className="absolute top-1 right-1 w-6 h-6 bg-slate-950 border-[3px] border-amber-400 rounded flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-amber-400" />
+                  </div>
+                  <div className="absolute bottom-1 left-1 w-6 h-6 bg-slate-950 border-[3px] border-amber-400 rounded flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-amber-400" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-[10px] font-mono text-amber-500 font-bold bg-amber-500/10 px-3 py-1 rounded-full inline-block">
+                Merchant UPI: {selectedMethodObj?.upi_id || 'cafe@upi'}
+              </p>
+            </div>
+          )}
+
+          {/* Reference ID Input */}
+          {method !== 'cash' && (
+            <div className="space-y-2">
+              <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Transaction Reference / Approval Code</label>
+              <input
+                type="text"
+                placeholder="Enter Transaction Ref Number..."
+                value={ref}
+                onChange={e => setRef(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 transition-colors font-mono"
+              />
+            </div>
+          )}
+
+          {/* Confirm Button */}
+          <button
+            onClick={handlePay}
+            disabled={loading}
+            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg shadow-amber-500/15 transition-all hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50 text-sm"
+          >
+            {loading ? 'Processing Payment...' : 'Confirm & Validate Payment'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReceiptModal({ order, onClose }) {
+  const printReceipt = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Receipt Body */}
+        <div id="receipt-print-area" className="flex-1 overflow-y-auto p-8 bg-white text-slate-800 text-xs font-mono space-y-4 selection:bg-slate-200">
+          <div className="text-center space-y-1">
+            <h2 className="text-base font-black uppercase tracking-wider text-slate-900">☕ Odoo Cafe POS</h2>
+            <p className="text-[10px] text-slate-500">123 Cafe Street, Rooftop</p>
+            <p className="text-[10px] text-slate-500">GSTIN: 27AAAAA1111A1Z1</p>
+          </div>
+
+          <div className="border-t border-dashed border-slate-300 pt-3 space-y-1 text-[10px] text-slate-500">
+            <div className="flex justify-between">
+              <span>Receipt No:</span>
+              <span className="font-bold text-slate-700">{order.order_number || `ORD-${order.id}`}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Date/Time:</span>
+              <span>{order.paid_at || new Date().toLocaleString()}</span>
+            </div>
+            {order.tableLabel && (
+              <div className="flex justify-between">
+                <span>Table:</span>
+                <span className="font-bold text-slate-700">{order.tableLabel}</span>
+              </div>
+            )}
+            {order.customerName && (
+              <div className="flex justify-between">
+                <span>Customer:</span>
+                <span className="font-bold text-slate-700">{order.customerName}</span>
+              </div>
+            )}
+          </div>
+
+          <table className="w-full border-t border-b border-dashed border-slate-300 py-3 text-[10px]">
+            <thead>
+              <tr className="text-slate-600 font-bold text-left">
+                <th className="pb-2">Item Description</th>
+                <th className="pb-2 text-center">Qty</th>
+                <th className="pb-2 text-right">Price</th>
+                <th className="pb-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items && order.items.length > 0 ? (
+                order.items.map(item => (
+                  <tr key={item.id} className="text-slate-700">
+                    <td className="py-1 max-w-[120px] truncate">{item.product_name}</td>
+                    <td className="py-1 text-center">{item.quantity}</td>
+                    <td className="py-1 text-right">{item.price ? fmt(item.price).replace('₹','') : fmt(item.unit_price).replace('₹','')}</td>
+                    <td className="py-1 text-right">{fmt(item.subtotal).replace('₹','')}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="text-slate-500 italic">
+                  <td colSpan="4" className="text-center py-2">Items already dispatched.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          <div className="space-y-1 text-right text-[10px]">
+            {order.subtotal && (
+              <div className="flex justify-between text-slate-500">
+                <span>Subtotal:</span>
+                <span>{fmt(order.subtotal)}</span>
+              </div>
+            )}
+            {order.discount_amount && parseFloat(order.discount_amount) > 0 && (
+              <div className="flex justify-between text-emerald-655 font-semibold">
+                <span>Coupon Discount:</span>
+                <span>−{fmt(order.discount_amount)}</span>
+              </div>
+            )}
+            {order.tax_amount && (
+              <div className="flex justify-between text-slate-500">
+                <span>GST/CGST/SGST:</span>
+                <span>{fmt(order.tax_amount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
+              <span>Total Paid:</span>
+              <span>{fmt(order.total_amount)}</span>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-slate-300 pt-4 text-center space-y-1 text-[9px] text-slate-500">
+            <p className="font-bold text-slate-700">Payment: {order.payment_method || 'Cash'}</p>
+            {order.payment_ref && <p className="font-mono text-[8px]">Ref: {order.payment_ref}</p>}
+            <p className="pt-2 text-[10px] font-bold text-slate-600">Thank you for visiting! 😊</p>
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="p-5 border-t border-gray-800 bg-gray-900 flex gap-2">
+          <button
+            onClick={printReceipt}
+            className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold rounded-2xl transition-all font-semibold text-xs"
+          >
+            🖨️ Print Receipt
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-2xl transition-all text-xs"
+          >
+            Done & Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

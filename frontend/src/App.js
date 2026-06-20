@@ -17,6 +17,7 @@ import { AuthProvider } from './context/AuthContext';
 
 // ── Code-split page imports ───────────────────────────────────────────────────
 const Login          = lazy(() => import('./pages/Login'));
+const Signup         = lazy(() => import('./pages/Signup'));
 const PosTerminal    = lazy(() => import('./pages/PosTerminal'));
 const Kds            = lazy(() => import('./pages/Kds'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -59,10 +60,11 @@ export default function App() {
             <Route index element={<Navigate to="/pos" replace />} />
 
             {/* All pages freely accessible */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/pos"   element={<PosTerminal />} />
-            <Route path="/kds"   element={<Kds />} />
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/login"  element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/pos"    element={<PosTerminal />} />
+            <Route path="/kds"    element={<Kds />} />
+            <Route path="/admin"  element={<AdminDashboard />} />
             <Route path="/admin/*" element={<AdminDashboard />} />
 
             {/* Fallback */}
