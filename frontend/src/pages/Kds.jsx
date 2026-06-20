@@ -52,34 +52,7 @@ const NEXT_STAGE = {
   completed: null,
 };
 
-// ── Mock orders for offline preview ──────────────────────────────────────────
-let _mockId = 1;
-function makeMockOrder(status, items) {
-  return {
-    id: _mockId++,
-    order_number: `ORD-${String(_mockId).padStart(4,'0')}`,
-    table_label: `T${Math.floor(Math.random()*10)+1}`,
-    status,
-    created_at: new Date(Date.now() - Math.random() * 15 * 60 * 1000).toISOString(),
-    items: items.map((name, idx) => ({
-      id: _mockId * 100 + idx,
-      product_name: name,
-      quantity: Math.ceil(Math.random() * 3),
-      kds_status: status === 'completed' ? 'completed' : 'pending',
-    })),
-  };
-}
-
-const INITIAL_MOCK = [
-  makeMockOrder('to_cook',   ['Espresso', 'Cappuccino', 'French Fries']),
-  makeMockOrder('to_cook',   ['Dal Makhani', 'Paneer Butter Masala', 'Garlic Bread']),
-  makeMockOrder('to_cook',   ['Mango Smoothie', 'Veg Sandwich']),
-  makeMockOrder('preparing', ['Latte', 'Chocolate Brownie', 'Gulab Jamun']),
-  makeMockOrder('preparing', ['Veg Biryani', 'Masala Chai']),
-  makeMockOrder('completed', ['Cold Coffee', 'Butter Croissant']),
-  makeMockOrder('completed', ['Iced Tea', 'Cheesecake', 'Banana Muffin']),
-];
-
+// Mock data removed in favour of live API
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -180,7 +153,7 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
           <TicketItem
             key={item.id}
             item={item}
-            onToggle={onToggleItem}
+            onToggle={(itemId) => onToggleItem(order.id, itemId)}
           />
         ))}
       </div>
@@ -210,7 +183,7 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
 // MAIN KDS COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Kds() {
-  const [orders,  setOrders]  = useState(INITIAL_MOCK);
+  const [orders,  setOrders]  = useState([]);
   const [search,  setSearch]  = useState('');
   const [lastSync, setLastSync] = useState(new Date());
   const pollRef = useRef(null);
@@ -223,13 +196,15 @@ export default function Kds() {
         setOrders(data);
         setLastSync(new Date());
       }
-    } catch { /* silently use mock */ }
+    } catch (err) {
+      console.error('Failed to sync KDS', err);
+    }
   }, []);
 
-  // Poll every 10 s
+  // Poll every 3 s
   useEffect(() => {
     fetchOrders();
-    pollRef.current = setInterval(fetchOrders, 10_000);
+    pollRef.current = setInterval(fetchOrders, 3_000);
     return () => clearInterval(pollRef.current);
   }, [fetchOrders]);
 
@@ -255,21 +230,21 @@ export default function Kds() {
   }, []);
 
   // ── Toggle individual item ──────────────────────────────────────────────
-  const handleToggleItem = useCallback(async (itemId) => {
+  const handleToggleItem = useCallback(async (orderId, itemId) => {
     setOrders(prev =>
-      prev.map(o => ({
+      prev.map(o => o.id === orderId ? {
         ...o,
         items: o.items.map(i =>
           i.id === itemId
             ? { ...i, kds_status: i.kds_status === 'completed' ? 'pending' : 'completed' }
             : i
         ),
-      }))
+      } : o)
     );
     try {
       const item = orders.flatMap(o => o.items).find(i => i.id === itemId);
       if (item) {
-        await kdsAPI.updateItem(itemId, item.kds_status === 'completed' ? 'pending' : 'completed');
+        await kdsAPI.updateItem(orderId, itemId, item.kds_status === 'completed' ? false : true);
       }
     } catch { /* optimistic */ }
   }, [orders]);

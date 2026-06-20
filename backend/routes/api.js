@@ -33,6 +33,22 @@ const {
   getCustomerSync,
 } = require('../controllers/orderController');
 
+const {
+  getAllCategories,
+  getCategoryById,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} = require('../controllers/categoryController');
+
+const {
+  getAllProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+} = require('../controllers/productController');
+
 // ─── Order Routes ─────────────────────────────────────────────────────────────
 
 /**
@@ -77,5 +93,19 @@ router.get('/sync/kds', getKdsSync);
  * Returns 200 + order payload when an active order exists, or 204 when idle.
  */
 router.get('/sync/customer-display/:tableId', getCustomerSync);
+
+// ─── Category Routes ──────────────────────────────────────────────────────────
+router.get('/categories', getAllCategories);
+router.get('/categories/:id', getCategoryById);
+router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
+
+// ─── Product Routes ───────────────────────────────────────────────────────────
+router.get('/products', getAllProducts);
+router.get('/products/:id', getProductById);
+router.post('/products', createProduct);
+router.put('/products/:id', updateProduct);
+router.delete('/products/:id', deleteProduct);
 
 module.exports = router;
