@@ -11,6 +11,7 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'employee') DEFAULT 'employee',
+    is_archived BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -33,8 +34,10 @@ CREATE TABLE products (
     price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     uom VARCHAR(20) DEFAULT 'unit', -- Unit of Measure
     tax DECIMAL(5, 2) DEFAULT 0.00, -- Tax percentage
+    tax_percent DECIMAL(5, 2) GENERATED ALWAYS AS (tax) STORED, -- Alias for orderController
     description TEXT,
     is_available BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN GENERATED ALWAYS AS (is_available) STORED, -- Alias for orderController
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -62,20 +65,36 @@ CREATE TABLE tables (
     UNIQUE KEY unique_table_per_floor (floor_id, table_number)
 ) ENGINE=InnoDB;
 
--- 6. Promotions Table
+-- 6. Customers Table
+DROP TABLE IF EXISTS customers;
+CREATE TABLE customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150),
+    phone VARCHAR(20),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 7. Promotions Table
 DROP TABLE IF EXISTS promotions;
 CREATE TABLE promotions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    type ENUM('percentage', 'fixed_amount') NOT NULL,
-    value DECIMAL(10, 2) NOT NULL,
-    start_date DATE,
-    end_date DATE,
+    apply_to ENUM('product', 'order') NOT NULL,
+    product_id INT, -- NULL if apply_to = 'order'
+    min_quantity INT DEFAULT 1, -- used when apply_to = 'product'
+    min_order_amount DECIMAL(10, 2), -- used when apply_to = 'order'
+    discount_type ENUM('percent', 'fixed') NOT NULL,
+    discount_value DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 7. Sessions Table (for Shift Management)
+-- 8. Sessions Table (for Shift Management)
 DROP TABLE IF EXISTS sessions;
 CREATE TABLE sessions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -87,29 +106,46 @@ CREATE TABLE sessions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 8. Orders Table
+-- 9. Orders Table
 DROP TABLE IF EXISTS orders;
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(20) NOT NULL UNIQUE,
     session_id INT,
     table_id INT,
-    total_amount DECIMAL(10, 2) DEFAULT 0.00,
+    customer_id INT,
+    cashier_id INT,
     status ENUM('draft', 'pending', 'paid', 'cancelled') DEFAULT 'draft',
+    kds_status ENUM('To Cook', 'Preparing', 'Completed') DEFAULT 'To Cook',
+    subtotal DECIMAL(10, 2) DEFAULT 0.00,
+    tax_amount DECIMAL(10, 2) DEFAULT 0.00,
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00,
+    total_amount DECIMAL(10, 2) DEFAULT 0.00,
+    source VARCHAR(20) DEFAULT 'pos',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-    FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE SET NULL
+    FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE SET NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+    FOREIGN KEY (cashier_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 9. Order Items Table
+-- 10. Order Items Table
 DROP TABLE IF EXISTS order_items;
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
     product_id INT,
+    product_name VARCHAR(100) NOT NULL,
+    unit_price DECIMAL(10, 2) NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
-    price DECIMAL(10, 2) NOT NULL, -- Price at the time of order
-    subtotal DECIMAL(10, 2) NOT NULL,
+    tax_percent DECIMAL(5, 2) DEFAULT 0.00,
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00,
+    line_total DECIMAL(10, 2) NOT NULL,
+    kds_status ENUM('pending', 'preparing', 'completed') DEFAULT 'pending',
+    is_item_completed TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

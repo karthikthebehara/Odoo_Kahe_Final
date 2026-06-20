@@ -107,6 +107,23 @@ const initDB = async () => {
             }
         }
 
+        // 7. Seed Promotions
+        const [productCheck] = await pool.query("SELECT id FROM products WHERE name = 'Cappuccino' LIMIT 1");
+        if (productCheck.length > 0) {
+            const cappuccinoId = productCheck[0].id;
+            await pool.query(`
+                INSERT INTO promotions (name, apply_to, product_id, min_quantity, min_order_amount, discount_type, discount_value)
+                SELECT * FROM (SELECT 'Cappuccino 10% Off' AS n, 'product' AS a, ? AS p, 2 AS mq, NULL AS moa, 'percent' AS dt, 10.00 AS dv) AS tmp
+                WHERE NOT EXISTS (SELECT id FROM promotions WHERE name = 'Cappuccino 10% Off') LIMIT 1;
+            `, [cappuccinoId]);
+        }
+
+        await pool.query(`
+            INSERT INTO promotions (name, apply_to, product_id, min_quantity, min_order_amount, discount_type, discount_value)
+            SELECT * FROM (SELECT 'Order $15 Discount' AS n, 'order' AS a, NULL AS p, NULL AS mq, 15.00 AS moa, 'fixed' AS dt, 2.00 AS dv) AS tmp
+            WHERE NOT EXISTS (SELECT id FROM promotions WHERE name = 'Order $15 Discount') LIMIT 1;
+        `);
+
         console.log('✅ Database seeding completed successfully.');
     } catch (error) {
         console.error('❌ Database initialization failed:', error);

@@ -24,10 +24,10 @@ const { pool } = require('../config/db');
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /**
- * Ordered KDS state machine for order-level status transitions.
- * Maps to `orders.status` ENUM: 'draft' → 'sent_to_kitchen' → 'paid' | 'cancelled'
+ * Ordered KDS state machine for kitchen display transitions.
+ * Maps to `orders.kds_status`: 'To Cook' → 'Preparing' → 'Completed'
  */
-const KDS_STATES = ['draft', 'sent_to_kitchen', 'paid'];
+const KDS_STATES = ['To Cook', 'Preparing', 'Completed'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -394,13 +394,13 @@ const createOrder = async (req, res) => {
 /**
  * PUT /api/orders/:id/kds
  *
- * Advances the order's status through the POS pipeline:
- *   draft → sent_to_kitchen → paid
+ * Advances the order's kds_status through the kitchen pipeline:
+ *   'To Cook' → 'Preparing' → 'Completed'
  *
- * Body (optional): { kds_status: "sent_to_kitchen" }
+ * Body: { status: "Preparing" | "Completed" }
  *   If provided, the supplied status is validated against KDS_STATES and
- *   applied directly.  If omitted, the current status is auto-advanced by
- *   one step.
+ *   applied directly.  If omitted, the current kds_status is auto-advanced
+ *   by one step.
  */
 const updateKdsStatus = async (req, res) => {
   const orderId = parseInt(req.params.id, 10);
@@ -409,8 +409,9 @@ const updateKdsStatus = async (req, res) => {
   }
 
   try {
+    // Fetch the current kds_status for this order
     const [rows] = await pool.execute(
-      'SELECT id, status FROM orders WHERE id = ?',
+      'SELECT id, kds_status FROM orders WHERE id = ?',
       [orderId]
     );
 
@@ -421,53 +422,45 @@ const updateKdsStatus = async (req, res) => {
     const order = rows[0];
     let newStatus;
 
-    if (req.body && req.body.kds_status) {
-      newStatus = req.body.kds_status;
+    if (req.body && req.body.status) {
+      // Explicit status supplied by the kitchen UI
+      newStatus = req.body.status;
       if (!KDS_STATES.includes(newStatus)) {
         return res.status(400).json({
           success: false,
-          error: `Invalid kds_status. Allowed values: ${KDS_STATES.join(', ')}.`,
+          error: `Invalid status. Allowed values: ${KDS_STATES.join(', ')}.`,
         });
       }
     } else {
-      const currentIdx = KDS_STATES.indexOf(order.status);
+      // Auto-advance: move one step forward in the state machine
+      const currentIdx = KDS_STATES.indexOf(order.kds_status);
       if (currentIdx === -1) {
         return res.status(422).json({
           success: false,
-          error: `Order has an unrecognised status: "${order.status}".`,
+          error: `Order has an unrecognised kds_status: "${order.kds_status}".`,
         });
       }
       if (currentIdx === KDS_STATES.length - 1) {
         return res.status(409).json({
           success: false,
-          error: `Order is already in the terminal state: ${order.status}.`,
+          error: 'Order is already in the terminal state: Completed.',
         });
       }
       newStatus = KDS_STATES[currentIdx + 1];
     }
 
-    // Also stamp kds_sent_at when transitioning into the kitchen
-    const kdsExtra =
-      newStatus === 'sent_to_kitchen'
-        ? ', kds_sent_at = NOW()'
-        : '';
-
     await pool.execute(
-      `UPDATE orders SET status = ?, updated_at = NOW()${kdsExtra} WHERE id = ?`,
+      'UPDATE orders SET kds_status = ?, updated_at = NOW() WHERE id = ?',
       [newStatus, orderId]
     );
 
     return res.status(200).json({
       success: true,
-      data: {
-        order_id:            orderId,
-        previous_kds_status: order.status,
-        kds_status:          newStatus,
-      },
+      data: { updated: true },
     });
   } catch (err) {
     console.error('[updateKdsStatus] Error:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to update KDS status.' });
   }
 };
 
@@ -476,14 +469,13 @@ const updateKdsStatus = async (req, res) => {
 /**
  * PUT /api/orders/:orderId/items/:itemId/complete
  *
- * Advances (or explicitly sets) the `kds_status` on a single order_item row.
- * Valid values: 'pending' → 'preparing' → 'completed'
+ * Toggles the `is_item_completed` boolean flag on a single order_item row.
+ * When a chef clicks an individual item line inside a KDS ticket, this
+ * flips the flag so kitchen staff can track completion item by item.
  *
- * Body (optional): { kds_status: "completed" }
- *   If omitted, the item's status is auto-advanced one step.
+ * Body (optional): { is_item_completed: true | false }
+ *   If omitted, the current value is toggled automatically.
  */
-const ITEM_KDS_STATES = ['pending', 'preparing', 'completed'];
-
 const updateItemCompletion = async (req, res) => {
   const orderId = parseInt(req.params.orderId, 10);
   const itemId  = parseInt(req.params.itemId,  10);
@@ -493,8 +485,9 @@ const updateItemCompletion = async (req, res) => {
   }
 
   try {
+    // Verify the item exists and belongs to the specified order
     const [rows] = await pool.execute(
-      'SELECT id, kds_status FROM order_items WHERE id = ? AND order_id = ?',
+      'SELECT id, is_item_completed FROM order_items WHERE id = ? AND order_id = ?',
       [itemId, orderId]
     );
 
@@ -506,50 +499,28 @@ const updateItemCompletion = async (req, res) => {
     }
 
     const item = rows[0];
-    let newStatus;
+    let newFlag;
 
-    if (req.body && req.body.kds_status) {
-      newStatus = req.body.kds_status;
-      if (!ITEM_KDS_STATES.includes(newStatus)) {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid kds_status. Allowed values: ${ITEM_KDS_STATES.join(', ')}.`,
-        });
-      }
+    if (req.body && typeof req.body.is_item_completed === 'boolean') {
+      // Explicit value supplied
+      newFlag = req.body.is_item_completed ? 1 : 0;
     } else {
-      const currentIdx = ITEM_KDS_STATES.indexOf(item.kds_status);
-      if (currentIdx === -1) {
-        return res.status(422).json({
-          success: false,
-          error: `Item has an unrecognised kds_status: "${item.kds_status}".`,
-        });
-      }
-      if (currentIdx === ITEM_KDS_STATES.length - 1) {
-        return res.status(409).json({
-          success: false,
-          error: 'Item is already completed.',
-        });
-      }
-      newStatus = ITEM_KDS_STATES[currentIdx + 1];
+      // Toggle: 0 → 1, 1 → 0
+      newFlag = item.is_item_completed ? 0 : 1;
     }
 
     await pool.execute(
-      'UPDATE order_items SET kds_status = ?, updated_at = NOW() WHERE id = ?',
-      [newStatus, itemId]
+      'UPDATE order_items SET is_item_completed = ?, updated_at = NOW() WHERE id = ?',
+      [newFlag, itemId]
     );
 
     return res.status(200).json({
       success: true,
-      data: {
-        item_id:              itemId,
-        order_id:             orderId,
-        previous_kds_status: item.kds_status,
-        kds_status:          newStatus,
-      },
+      data: { updated: true },
     });
   } catch (err) {
     console.error('[updateItemCompletion] Error:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to update item completion status.' });
   }
 };
 
