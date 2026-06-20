@@ -21,8 +21,7 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   Download,
-  Calendar,
-  Filter
+  Calendar
 } from 'lucide-react';
 
 const NAV = [
@@ -1701,7 +1700,7 @@ function ReportsPanel() {
   const [products, setProducts] = useState([]);
   
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [, setError] = useState(''); // kept for future error display
 
   const loadFilterData = useCallback(async () => {
     try {
