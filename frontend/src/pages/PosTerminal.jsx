@@ -19,6 +19,7 @@
  */
 
 import React, { useReducer, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { categoriesAPI, productsAPI, ordersAPI } from '../utils/api';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITY
@@ -109,39 +110,7 @@ const Icons = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MOCK DATA
 // ═══════════════════════════════════════════════════════════════════════════════
-const CATEGORIES = [
-  { id: 1, name: 'Coffee & Hot Drinks', color: '#c2683a' },
-  { id: 2, name: 'Cold Beverages',      color: '#3b82f6' },
-  { id: 3, name: 'Snacks & Starters',   color: '#f59e0b' },
-  { id: 4, name: 'Main Course',         color: '#ef4444' },
-  { id: 5, name: 'Desserts',            color: '#ec4899' },
-  { id: 6, name: 'Breads & Bakery',     color: '#84cc16' },
-];
-
-const PRODUCTS = [
-  { id:  1, category_id: 1, name: 'Espresso',             price:  80, tax: 5, uom: 'cup'   },
-  { id:  2, category_id: 1, name: 'Cappuccino',           price: 120, tax: 5, uom: 'cup'   },
-  { id:  3, category_id: 1, name: 'Latte',                price: 130, tax: 5, uom: 'cup'   },
-  { id:  4, category_id: 1, name: 'Masala Chai',          price:  60, tax: 5, uom: 'cup'   },
-  { id:  5, category_id: 1, name: 'Hot Chocolate',        price: 110, tax: 5, uom: 'cup'   },
-  { id:  6, category_id: 2, name: 'Cold Coffee',          price: 140, tax: 5, uom: 'cup'   },
-  { id:  7, category_id: 2, name: 'Mango Smoothie',       price: 120, tax: 5, uom: 'cup'   },
-  { id:  8, category_id: 2, name: 'Fresh Lime Soda',      price:  80, tax: 5, uom: 'cup'   },
-  { id:  9, category_id: 2, name: 'Iced Tea',             price:  90, tax: 5, uom: 'cup'   },
-  { id: 10, category_id: 3, name: 'Veg Sandwich',         price: 100, tax: 5, uom: 'piece' },
-  { id: 11, category_id: 3, name: 'Paneer Tikka',         price: 180, tax: 5, uom: 'plate' },
-  { id: 12, category_id: 3, name: 'French Fries',         price:  90, tax: 5, uom: 'plate' },
-  { id: 13, category_id: 4, name: 'Dal Makhani',          price: 200, tax: 5, uom: 'plate' },
-  { id: 14, category_id: 4, name: 'Paneer Butter Masala', price: 220, tax: 5, uom: 'plate' },
-  { id: 15, category_id: 4, name: 'Veg Biryani',          price: 180, tax: 5, uom: 'plate' },
-  { id: 16, category_id: 5, name: 'Chocolate Brownie',    price: 110, tax: 5, uom: 'piece' },
-  { id: 17, category_id: 5, name: 'Gulab Jamun',          price:  80, tax: 5, uom: 'plate' },
-  { id: 18, category_id: 5, name: 'Cheesecake',           price: 150, tax: 5, uom: 'piece' },
-  { id: 19, category_id: 6, name: 'Butter Croissant',     price:  80, tax: 5, uom: 'piece' },
-  { id: 20, category_id: 6, name: 'Garlic Bread',         price:  90, tax: 5, uom: 'plate' },
-  { id: 21, category_id: 6, name: 'Cinnamon Roll',        price: 100, tax: 5, uom: 'piece' },
-  { id: 22, category_id: 3, name: 'Nachos & Salsa',       price: 130, tax: 5, uom: 'plate' },
-];
+// Dynamic data fetched from API
 
 const FLOORS = [
   {
@@ -620,20 +589,44 @@ export default function PosTerminal() {
   const [showDiscount, setShowDiscount] = useState(false);
   const [sendState,   setSendState]     = useState('idle'); // 'idle' | 'sending' | 'sent'
 
+  // Dynamic API state
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchData() {
+      try {
+        const [cats, prods] = await Promise.all([
+          categoriesAPI.list(),
+          productsAPI.list()
+        ]);
+        if (mounted) {
+          setCategories(cats || []);
+          setProducts(prods || []);
+        }
+      } catch (err) {
+        console.error('Failed to load catalog', err);
+      }
+    }
+    fetchData();
+    return () => { mounted = false; };
+  }, []);
+
   // ── Derived data ─────────────────────────────────────────────────────────────
   const catMap = useMemo(
-    () => Object.fromEntries(CATEGORIES.map(c => [c.id, c])),
-    []
+    () => Object.fromEntries(categories.map(c => [c.id, c])),
+    [categories]
   );
 
   const visibleProducts = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return PRODUCTS.filter(p => {
+    return products.filter(p => {
       const matchCat = activeCatId === null || p.category_id === activeCatId;
       const matchQ   = p.name.toLowerCase().includes(q);
       return matchCat && matchQ;
     });
-  }, [activeCatId, searchQuery]);
+  }, [activeCatId, searchQuery, products]);
 
   const cartQtyMap = useMemo(
     () => Object.fromEntries(cart.items.map(i => [i.id, i.qty])),
@@ -654,10 +647,20 @@ export default function PosTerminal() {
   const handleSendToKitchen = async () => {
     if (cart.items.length === 0 || sendState !== 'idle') return;
     setSendState('sending');
-    // Simulate async API call
-    await new Promise(r => setTimeout(r, 900));
-    setSendState('sent');
-    setTimeout(() => setSendState('idle'), 2800);
+    try {
+      await ordersAPI.create({
+        table_id: cart.tableId,
+        customer_name: '',
+        customer_phone: '',
+        items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty }))
+      });
+      setSendState('sent');
+      dispatch({ type: 'CLEAR' });
+      setTimeout(() => setSendState('idle'), 2800);
+    } catch (err) {
+      console.error('Failed to send order', err);
+      setSendState('idle');
+    }
   };
 
   // ── Keyboard shortcut: Escape to close modals ────────────────────────────
@@ -757,10 +760,10 @@ export default function PosTerminal() {
                   : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:text-white hover:border-gray-600',
               ].join(' ')}
             >
-              All Items ({PRODUCTS.length})
+              All Items ({products.length})
             </button>
 
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <CategoryTab
                 key={cat.id}
                 cat={cat}
