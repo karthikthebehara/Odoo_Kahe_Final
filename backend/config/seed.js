@@ -107,6 +107,90 @@ const initDB = async () => {
             }
         }
 
+        // 7. Seed Promotions (Three-tier engine demo data)
+        // Fetch product IDs for product-level promos
+        const [productRows] = await pool.query('SELECT id, name FROM products');
+        const productMap = {};
+        productRows.forEach(row => productMap[row.name] = row.id);
+
+        const promotions = [
+            // ── Manual Coupon ──────────────────────────────────────────────
+            // 10% off the whole order when customer presents code WELCOME10
+            {
+                name: 'Welcome 10% Off',
+                type: 'coupon',
+                discount_type: 'percentage',
+                value: 10.00,
+                coupon_code: 'WELCOME10',
+                product_id: null,
+                min_quantity: null,
+                min_order_amount: null,
+            },
+            // Flat ₹50 off with code FLAT50
+            {
+                name: 'Flat 50 Off',
+                type: 'coupon',
+                discount_type: 'fixed_amount',
+                value: 50.00,
+                coupon_code: 'FLAT50',
+                product_id: null,
+                min_quantity: null,
+                min_order_amount: null,
+            },
+
+            // ── Automated Product Promo ────────────────────────────────────
+            // Buy 3+ Cappuccinos → 15% off that line
+            {
+                name: 'Cappuccino Bulk Deal',
+                type: 'automated_product',
+                discount_type: 'percentage',
+                value: 15.00,
+                coupon_code: null,
+                product_id: productMap['Cappuccino'],
+                min_quantity: 3,
+                min_order_amount: null,
+            },
+            // Buy 2+ Cheese Cakes → ₹2 flat off that line
+            {
+                name: 'Cheesecake Pair Deal',
+                type: 'automated_product',
+                discount_type: 'fixed_amount',
+                value: 2.00,
+                coupon_code: null,
+                product_id: productMap['Cheese Cake'],
+                min_quantity: 2,
+                min_order_amount: null,
+            },
+
+            // ── Automated Order Promo ──────────────────────────────────────
+            // Cart ≥ ₹25 → 5% off the whole order
+            {
+                name: 'Spend 25 Save 5%',
+                type: 'automated_order',
+                discount_type: 'percentage',
+                value: 5.00,
+                coupon_code: null,
+                product_id: null,
+                min_quantity: null,
+                min_order_amount: 25.00,
+            },
+        ];
+
+        for (const promo of promotions) {
+            await pool.query(`
+                INSERT INTO promotions
+                    (name, type, discount_type, value, coupon_code, product_id, min_quantity, min_order_amount)
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?
+                FROM DUAL
+                WHERE NOT EXISTS (SELECT id FROM promotions WHERE name = ?)
+                LIMIT 1;
+            `, [
+                promo.name, promo.type, promo.discount_type, promo.value,
+                promo.coupon_code, promo.product_id, promo.min_quantity,
+                promo.min_order_amount, promo.name,
+            ]);
+        }
+
         console.log('✅ Database seeding completed successfully.');
     } catch (error) {
         console.error('❌ Database initialization failed:', error);

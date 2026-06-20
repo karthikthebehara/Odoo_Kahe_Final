@@ -62,17 +62,26 @@ CREATE TABLE tables (
     UNIQUE KEY unique_table_per_floor (floor_id, table_number)
 ) ENGINE=InnoDB;
 
--- 6. Promotions Table
+-- 6. Promotions Table (Three-tier promotion engine)
+--    type = 'coupon'             → Manual coupon codes entered at checkout
+--    type = 'automated_product'  → Auto-fires when item qty >= min_quantity
+--    type = 'automated_order'    → Auto-fires when cart total >= min_order_amount
 DROP TABLE IF EXISTS promotions;
 CREATE TABLE promotions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    type ENUM('percentage', 'fixed_amount') NOT NULL,
-    value DECIMAL(10, 2) NOT NULL,
+    type ENUM('coupon', 'automated_product', 'automated_order') NOT NULL,
+    discount_type ENUM('percentage', 'fixed_amount') NOT NULL,
+    value DECIMAL(10, 2) NOT NULL,                    -- Discount value (% or flat amount)
+    coupon_code VARCHAR(50) DEFAULT NULL UNIQUE,       -- Only for type = 'coupon'
+    product_id INT DEFAULT NULL,                       -- Only for type = 'automated_product'
+    min_quantity INT DEFAULT NULL,                     -- Qty threshold for product promos
+    min_order_amount DECIMAL(10, 2) DEFAULT NULL,      -- Cart-total threshold for order promos
     start_date DATE,
     end_date DATE,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- 7. Sessions Table (for Shift Management)
@@ -93,7 +102,10 @@ CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     session_id INT,
     table_id INT,
-    total_amount DECIMAL(10, 2) DEFAULT 0.00,
+    subtotal DECIMAL(10, 2) DEFAULT 0.00,          -- Cart total before discounts
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00,    -- Total discount deducted
+    tax_amount DECIMAL(10, 2) DEFAULT 0.00,         -- Total tax applied
+    total_amount DECIMAL(10, 2) DEFAULT 0.00,       -- Final payable amount
     status ENUM('draft', 'pending', 'paid', 'cancelled') DEFAULT 'draft',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
@@ -107,8 +119,9 @@ CREATE TABLE order_items (
     order_id INT,
     product_id INT,
     quantity INT NOT NULL DEFAULT 1,
-    price DECIMAL(10, 2) NOT NULL, -- Price at the time of order
-    subtotal DECIMAL(10, 2) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,              -- Unit price at time of order
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00, -- Per-line discount applied
+    subtotal DECIMAL(10, 2) NOT NULL,            -- (price * qty) - discount
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL

@@ -9,13 +9,10 @@
  * Registered endpoints
  * ────────────────────
  * Orders
- *   POST   /api/orders                                    → createOrder
- *   PUT    /api/orders/:id/kds                            → updateKdsStatus
- *   PUT    /api/orders/:orderId/items/:itemId/complete    → updateItemCompletion
- *
- * Sync / Polling
- *   GET    /api/sync/kds                                  → getKdsSync
- *   GET    /api/sync/customer-display/:tableId            → getCustomerSync
+ *   POST   /api/orders                → createOrder  (with 3-tier promo engine)
+ *   GET    /api/orders                → getOrders    (active orders + items)
+ *   GET    /api/orders/:id            → getOrderById (single order + items)
+ *   PUT    /api/orders/:id/status     → updateOrderStatus
  */
 
 'use strict';
@@ -27,55 +24,45 @@ const router  = express.Router();
 
 const {
   createOrder,
-  updateKdsStatus,
-  updateItemCompletion,
-  getKdsSync,
-  getCustomerSync,
+  updateOrderStatus,
+  getOrders,
+  getOrderById,
 } = require('../controllers/orderController');
 
 // ─── Order Routes ─────────────────────────────────────────────────────────────
 
 /**
  * POST /api/orders
- * Create a new order with full promotion calculation inside a DB transaction.
+ * Create a new order with full three-tier promotion engine inside a DB transaction.
  *
- * Body: { table_id, customer_name?, customer_phone?, items: [{ product_id, quantity }] }
+ * Body: {
+ *   session_id: number,
+ *   table_id?: number,
+ *   coupon_code?: string,
+ *   items: [{ product_id: number, quantity: number }]
+ * }
  */
 router.post('/orders', createOrder);
 
 /**
- * PUT /api/orders/:id/kds
- * Advance (or explicitly set) the KDS status of an order.
+ * GET /api/orders
+ * List all active (draft/pending) orders with their line items.
+ */
+router.get('/orders', getOrders);
+
+/**
+ * GET /api/orders/:id
+ * Fetch a single order by ID with its line items.
+ */
+router.get('/orders/:id', getOrderById);
+
+/**
+ * PUT /api/orders/:id/status
+ * Advance (or explicitly set) the status of an order.
  *
- * Params: id        – order id
- * Body (optional):  { kds_status: "Preparing" | "Completed" }
+ * Body (optional): { status: "pending" | "paid" | "cancelled" }
  * If body is omitted, the status is auto-advanced one step forward.
  */
-router.put('/orders/:id/kds', updateKdsStatus);
-
-/**
- * PUT /api/orders/:orderId/items/:itemId/complete
- * Toggle or explicitly set the is_item_completed flag on a single order item.
- *
- * Params: orderId, itemId
- * Body (optional): { is_item_completed: true | false }
- */
-router.put('/orders/:orderId/items/:itemId/complete', updateItemCompletion);
-
-// ─── Sync / Polling Routes ────────────────────────────────────────────────────
-
-/**
- * GET /api/sync/kds
- * Lightweight KDS polling payload — all non-completed open orders with items.
- * Designed for sub-5 s short-polling intervals from the kitchen display.
- */
-router.get('/sync/kds', getKdsSync);
-
-/**
- * GET /api/sync/customer-display/:tableId
- * Lightweight customer-display polling payload for a specific table.
- * Returns 200 + order payload when an active order exists, or 204 when idle.
- */
-router.get('/sync/customer-display/:tableId', getCustomerSync);
+router.put('/orders/:id/status', updateOrderStatus);
 
 module.exports = router;
