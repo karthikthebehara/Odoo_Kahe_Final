@@ -11,6 +11,7 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'employee') DEFAULT 'employee',
+    is_archived BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -33,8 +34,10 @@ CREATE TABLE products (
     price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     uom VARCHAR(20) DEFAULT 'unit', -- Unit of Measure
     tax DECIMAL(5, 2) DEFAULT 0.00, -- Tax percentage
+    tax_percent DECIMAL(5, 2) GENERATED ALWAYS AS (tax) STORED, -- Alias for orderController
     description TEXT,
     is_available BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN GENERATED ALWAYS AS (is_available) STORED, -- Alias for orderController
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -100,6 +103,7 @@ CREATE TABLE sessions (
 DROP TABLE IF EXISTS orders;
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(20) NOT NULL UNIQUE,
     session_id INT,
     table_id INT,
     subtotal DECIMAL(10, 2) DEFAULT 0.00,          -- Cart total before discounts
@@ -107,7 +111,9 @@ CREATE TABLE orders (
     tax_amount DECIMAL(10, 2) DEFAULT 0.00,         -- Total tax applied
     total_amount DECIMAL(10, 2) DEFAULT 0.00,       -- Final payable amount
     status ENUM('draft', 'pending', 'paid', 'cancelled') DEFAULT 'draft',
+    kds_status ENUM('To Cook', 'Preparing', 'Completed') DEFAULT 'To Cook',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
     FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -122,7 +128,10 @@ CREATE TABLE order_items (
     price DECIMAL(10, 2) NOT NULL,              -- Unit price at time of order
     discount_amount DECIMAL(10, 2) DEFAULT 0.00, -- Per-line discount applied
     subtotal DECIMAL(10, 2) NOT NULL,            -- (price * qty) - discount
+    kds_status ENUM('pending', 'preparing', 'completed') DEFAULT 'pending',
+    is_item_completed TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

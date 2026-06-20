@@ -16,10 +16,6 @@ const initDB = async () => {
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
         
         // Split by ';' but be careful with formatted SQL. 
-        // For simplicity with mysql2, we can't run multiple statements in one query by default unless enabled,
-        // but it's better to split them or use a connection that allows it.
-        // The pool doesn't have multipleStatements: true by default.
-        // Let's execute the raw SQL individually.
         const statements = schemaSql
             .split(';')
             .map(s => s.trim())
@@ -110,8 +106,8 @@ const initDB = async () => {
         // 7. Seed Promotions (Three-tier engine demo data)
         // Fetch product IDs for product-level promos
         const [productRows] = await pool.query('SELECT id, name FROM products');
-        const productMap = {};
-        productRows.forEach(row => productMap[row.name] = row.id);
+        const productMap2 = {};
+        productRows.forEach(row => productMap2[row.name] = row.id);
 
         const promotions = [
             // ── Manual Coupon ──────────────────────────────────────────────
@@ -146,7 +142,7 @@ const initDB = async () => {
                 discount_type: 'percentage',
                 value: 15.00,
                 coupon_code: null,
-                product_id: productMap['Cappuccino'],
+                product_id: productMap2['Cappuccino'],
                 min_quantity: 3,
                 min_order_amount: null,
             },
@@ -157,7 +153,7 @@ const initDB = async () => {
                 discount_type: 'fixed_amount',
                 value: 2.00,
                 coupon_code: null,
-                product_id: productMap['Cheese Cake'],
+                product_id: productMap2['Cheese Cake'],
                 min_quantity: 2,
                 min_order_amount: null,
             },

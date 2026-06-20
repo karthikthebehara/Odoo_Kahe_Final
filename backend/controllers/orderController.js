@@ -36,6 +36,14 @@
 
 const { pool } = require('../config/db');
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/**
+ * Ordered KDS state machine for kitchen display transitions.
+ * Maps to `orders.kds_status`: 'To Cook' → 'Preparing' → 'Completed'
+ */
+const KDS_STATES = ['To Cook', 'Preparing', 'Completed'];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -273,7 +281,6 @@ const createOrder = async (req, res) => {
 
     // Tax is computed per-line at each product's own rate, then summed.
     // The discount is proportionally distributed across lines for tax calc.
-    // Simplification: tax on each line's post-discount subtotal.
     let totalTax = 0;
     for (const line of lineItems) {
       // Proportional share of order-wide discounts applied to this line
@@ -289,15 +296,23 @@ const createOrder = async (req, res) => {
 
     const finalTotal = round2(discountedSubtotal + totalTax);
 
+    // Generate consecutive order number: ORD-00001, etc.
+    const [[{ maxId }]] = await connection.execute(
+      'SELECT COALESCE(MAX(id), 0) AS maxId FROM orders'
+    );
+    const nextSeq = parseInt(maxId, 10) + 1;
+    const orderNumber = `ORD-${String(nextSeq).padStart(5, '0')}`;
+
     // ── STEP 7: INSERT order header ────────────────────────────────────────
-    //    Schema: orders(session_id, table_id, subtotal, discount_amount,
+    //    Schema: orders(order_number, session_id, table_id, subtotal, discount_amount,
     //            tax_amount, total_amount, status)
     const [orderResult] = await connection.execute(
       `INSERT INTO orders
-         (session_id, table_id, subtotal, discount_amount, tax_amount,
+         (order_number, session_id, table_id, subtotal, discount_amount, tax_amount,
           total_amount, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'draft', NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', NOW())`,
       [
+        orderNumber,
         session_id,
         table_id,
         cartGross,           // pre-discount line sum
@@ -339,6 +354,7 @@ const createOrder = async (req, res) => {
         total:   finalTotal,
         order: {
           id:              orderId,
+          order_number:    orderNumber,
           session_id,
           table_id,
           status:          'draft',
@@ -399,20 +415,12 @@ const createOrder = async (req, res) => {
 
 // ─── updateOrderStatus ────────────────────────────────────────────────────────
 
-/**
- * PUT /api/orders/:id/status
- *
- * Advances the order's status through the POS pipeline:
- *   draft → pending → paid
- *
- * Body (optional): { status: "pending" }
- *   If provided, validated against allowed values and applied directly.
- *   If omitted, the status is auto-advanced one step forward.
- *
- * Schema: orders.status ENUM('draft','pending','paid','cancelled')
- */
 const ORDER_STATES = ['draft', 'pending', 'paid'];
 
+/**
+ * PUT /api/orders/:id/status
+ * Advances POS status.
+ */
 const updateOrderStatus = async (req, res) => {
   const orderId = parseInt(req.params.id, 10);
   if (isNaN(orderId)) {
@@ -451,7 +459,7 @@ const updateOrderStatus = async (req, res) => {
       if (currentIdx === ORDER_STATES.length - 1) {
         return res.status(409).json({
           success: false,
-          error: `Order is already in the terminal state: ${order.status}.`,
+          error: 'Order is already in the terminal state.',
         });
       }
       newStatus = ORDER_STATES[currentIdx + 1];
@@ -476,20 +484,134 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// ─── updateKdsStatus ──────────────────────────────────────────────────────────
+
+/**
+ * PUT /api/orders/:id/kds
+ * Advances KDS kitchen status.
+ */
+const updateKdsStatus = async (req, res) => {
+  const orderId = parseInt(req.params.id, 10);
+  if (isNaN(orderId)) {
+    return res.status(400).json({ success: false, error: 'Invalid order id.' });
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, kds_status FROM orders WHERE id = ?',
+      [orderId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: `Order ${orderId} not found.` });
+    }
+
+    const order = rows[0];
+    let newStatus;
+
+    if (req.body && req.body.status) {
+      newStatus = req.body.status;
+      if (!KDS_STATES.includes(newStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status. Allowed values: ${KDS_STATES.join(', ')}.`,
+        });
+      }
+    } else {
+      const currentIdx = KDS_STATES.indexOf(order.kds_status);
+      if (currentIdx === -1) {
+        return res.status(422).json({
+          success: false,
+          error: `Order has an unrecognised kds_status: "${order.kds_status}".`,
+        });
+      }
+      if (currentIdx === KDS_STATES.length - 1) {
+        return res.status(409).json({
+          success: false,
+          error: 'Order is already in the terminal state: Completed.',
+        });
+      }
+      newStatus = KDS_STATES[currentIdx + 1];
+    }
+
+    await pool.execute(
+      'UPDATE orders SET kds_status = ?, updated_at = NOW() WHERE id = ?',
+      [newStatus, orderId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { updated: true },
+    });
+  } catch (err) {
+    console.error('[updateKdsStatus] Error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update KDS status.' });
+  }
+};
+
+// ─── updateItemCompletion ─────────────────────────────────────────────────────
+
+/**
+ * PUT /api/orders/:orderId/items/:itemId/complete
+ * Toggles line-item completion.
+ */
+const updateItemCompletion = async (req, res) => {
+  const orderId = parseInt(req.params.orderId, 10);
+  const itemId  = parseInt(req.params.itemId,  10);
+
+  if (isNaN(orderId) || isNaN(itemId)) {
+    return res.status(400).json({ success: false, error: 'Invalid orderId or itemId.' });
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, is_item_completed FROM order_items WHERE id = ? AND order_id = ?',
+      [itemId, orderId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: `Item ${itemId} not found under order ${orderId}.`,
+      });
+    }
+
+    const item = rows[0];
+    let newFlag;
+
+    if (req.body && typeof req.body.is_item_completed === 'boolean') {
+      newFlag = req.body.is_item_completed ? 1 : 0;
+    } else {
+      newFlag = item.is_item_completed ? 0 : 1;
+    }
+
+    await pool.execute(
+      'UPDATE order_items SET is_item_completed = ?, updated_at = NOW() WHERE id = ?',
+      [newFlag, itemId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { updated: true },
+    });
+  } catch (err) {
+    console.error('[updateItemCompletion] Error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update item completion status.' });
+  }
+};
+
 // ─── getOrders ────────────────────────────────────────────────────────────────
 
 /**
  * GET /api/orders
- *
- * Returns all active (non-paid, non-cancelled) orders with their line items.
- * Used by KDS and admin dashboard.
+ * Returns active orders with line items.
  */
 const getOrders = async (req, res) => {
   try {
     const [orders] = await pool.execute(
-      `SELECT id, session_id, table_id,
+      `SELECT id, order_number, session_id, table_id,
               subtotal, discount_amount, tax_amount, total_amount,
-              status, created_at
+              status, kds_status, created_at
          FROM orders
         WHERE status IN ('draft', 'pending')
         ORDER BY created_at ASC`
@@ -504,7 +626,8 @@ const getOrders = async (req, res) => {
 
     const [items] = await pool.execute(
       `SELECT oi.id, oi.order_id, oi.product_id, p.name AS product_name,
-              oi.quantity, oi.price, oi.discount_amount, oi.subtotal
+              oi.quantity, oi.price, oi.discount_amount, oi.subtotal AS line_total,
+              oi.kds_status, oi.is_item_completed
          FROM order_items oi
          LEFT JOIN products p ON p.id = oi.product_id
         WHERE oi.order_id IN (${itemPlaceholders})
@@ -512,7 +635,6 @@ const getOrders = async (req, res) => {
       orderIds
     );
 
-    // Group items by order_id
     const itemsByOrder = {};
     for (const item of items) {
       if (!itemsByOrder[item.order_id]) {
@@ -537,8 +659,7 @@ const getOrders = async (req, res) => {
 
 /**
  * GET /api/orders/:id
- *
- * Returns a single order with its line items.
+ * Returns a single order with items.
  */
 const getOrderById = async (req, res) => {
   const orderId = parseInt(req.params.id, 10);
@@ -548,9 +669,9 @@ const getOrderById = async (req, res) => {
 
   try {
     const [orderRows] = await pool.execute(
-      `SELECT id, session_id, table_id,
+      `SELECT id, order_number, session_id, table_id,
               subtotal, discount_amount, tax_amount, total_amount,
-              status, created_at
+              status, kds_status, created_at
          FROM orders
         WHERE id = ?`,
       [orderId]
@@ -564,7 +685,8 @@ const getOrderById = async (req, res) => {
 
     const [items] = await pool.execute(
       `SELECT oi.id, oi.product_id, p.name AS product_name,
-              oi.quantity, oi.price, oi.discount_amount, oi.subtotal
+              oi.quantity, oi.price, oi.discount_amount, oi.subtotal AS line_total,
+              oi.kds_status, oi.is_item_completed
          FROM order_items oi
          LEFT JOIN products p ON p.id = oi.product_id
         WHERE oi.order_id = ?
@@ -582,11 +704,122 @@ const getOrderById = async (req, res) => {
   }
 };
 
+// ─── getKdsSync ───────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/sync/kds
+ * Lightweight KDS polling endpoint.
+ */
+const getKdsSync = async (req, res) => {
+  try {
+    const [orders] = await pool.execute(
+      `SELECT id, order_number, table_id, status, kds_status,
+              subtotal, discount_amount, tax_amount, total_amount,
+              created_at, updated_at
+         FROM orders
+        WHERE kds_status IN ('To Cook', 'Preparing')
+        ORDER BY created_at ASC`
+    );
+
+    if (orders.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const orderIds         = orders.map((o) => o.id);
+    const itemPlaceholders = orderIds.map(() => '?').join(', ');
+
+    const [items] = await pool.execute(
+      `SELECT oi.id, oi.order_id, oi.product_id, p.name AS product_name,
+              oi.quantity, oi.price, oi.discount_amount, oi.subtotal AS line_total,
+              oi.kds_status, oi.is_item_completed
+         FROM order_items oi
+         LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id IN (${itemPlaceholders})
+        ORDER BY oi.id ASC`,
+      orderIds
+    );
+
+    const itemsByOrder = {};
+    for (const item of items) {
+      if (!itemsByOrder[item.order_id]) {
+        itemsByOrder[item.order_id] = [];
+      }
+      itemsByOrder[item.order_id].push(item);
+    }
+
+    const payload = orders.map((order) => ({
+      ...order,
+      items: itemsByOrder[order.id] || [],
+    }));
+
+    return res.status(200).json({ success: true, data: payload });
+  } catch (err) {
+    console.error('[getKdsSync] Error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ─── getCustomerSync ──────────────────────────────────────────────────────────
+
+/**
+ * GET /api/sync/customer-display/:tableId
+ * Customer display polling endpoint.
+ */
+const getCustomerSync = async (req, res) => {
+  const tableId = parseInt(req.params.tableId, 10);
+  if (isNaN(tableId)) {
+    return res.status(400).json({ success: false, error: 'Invalid tableId.' });
+  }
+
+  try {
+    const [orderRows] = await pool.execute(
+      `SELECT id, order_number, table_id,
+              subtotal, discount_amount, tax_amount, total_amount,
+              status, kds_status, created_at, updated_at
+         FROM orders
+        WHERE table_id = ?
+          AND status IN ('draft', 'pending')
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [tableId]
+    );
+
+    if (orderRows.length === 0) {
+      return res.status(204).send();
+    }
+
+    const order = orderRows[0];
+
+    const [items] = await pool.execute(
+      `SELECT oi.id, oi.product_id, p.name AS product_name,
+              oi.quantity, oi.price, oi.discount_amount, oi.subtotal AS line_total,
+              oi.kds_status, oi.is_item_completed
+         FROM order_items oi
+         LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = ?
+        ORDER BY oi.id ASC`,
+      [order.id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { order, items },
+    });
+  } catch (err) {
+    console.error('[getCustomerSync] Error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   createOrder,
   updateOrderStatus,
+  updateKdsStatus,
+  updateItemCompletion,
   getOrders,
   getOrderById,
+  getKdsSync,
+  getCustomerSync,
 };

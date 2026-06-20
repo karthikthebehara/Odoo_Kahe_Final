@@ -9,10 +9,16 @@
  * Registered endpoints
  * ────────────────────
  * Orders
- *   POST   /api/orders                → createOrder  (with 3-tier promo engine)
- *   GET    /api/orders                → getOrders    (active orders + items)
- *   GET    /api/orders/:id            → getOrderById (single order + items)
- *   PUT    /api/orders/:id/status     → updateOrderStatus
+ *   POST   /api/orders                                    → createOrder  (with 3-tier promo engine)
+ *   GET    /api/orders                                    → getOrders    (active orders + items)
+ *   GET    /api/orders/:id                                → getOrderById (single order + items)
+ *   PUT    /api/orders/:id/status                         → updateOrderStatus
+ *   PUT    /api/orders/:id/kds                            → updateKdsStatus
+ *   PUT    /api/orders/:orderId/items/:itemId/complete    → updateItemCompletion
+ *
+ * Sync / Polling
+ *   GET    /api/sync/kds                                  → getKdsSync
+ *   GET    /api/sync/customer-display/:tableId            → getCustomerSync
  */
 
 'use strict';
@@ -25,8 +31,12 @@ const router  = express.Router();
 const {
   createOrder,
   updateOrderStatus,
+  updateKdsStatus,
+  updateItemCompletion,
   getOrders,
   getOrderById,
+  getKdsSync,
+  getCustomerSync,
 } = require('../controllers/orderController');
 
 const {
@@ -68,6 +78,39 @@ router.get('/orders/:id', getOrderById);
  * If body is omitted, the status is auto-advanced one step forward.
  */
 router.put('/orders/:id/status', updateOrderStatus);
+
+/**
+ * PUT /api/orders/:id/kds
+ * Advance (or explicitly set) the KDS status of an order.
+ *
+ * Params: id        – order id
+ * Body (optional):  { status: "Preparing" | "Completed" }
+ * If body is omitted, the status is auto-advanced one step forward.
+ */
+router.put('/orders/:id/kds', updateKdsStatus);
+
+/**
+ * PUT /api/orders/:orderId/items/:itemId/complete
+ * Toggle or explicitly set the is_item_completed flag on a single order item.
+ *
+ * Params: orderId, itemId
+ * Body (optional): { is_item_completed: true | false }
+ */
+router.put('/orders/:orderId/items/:itemId/complete', updateItemCompletion);
+
+// ─── Sync / Polling Routes ────────────────────────────────────────────────────
+
+/**
+ * GET /api/sync/kds
+ * Lightweight KDS polling payload — active orders with items.
+ */
+router.get('/sync/kds', getKdsSync);
+
+/**
+ * GET /api/sync/customer-display/:tableId
+ * Lightweight customer-display polling payload for a specific table.
+ */
+router.get('/sync/customer-display/:tableId', getCustomerSync);
 
 // ─── Reporting Routes ─────────────────────────────────────────────────────────
 
