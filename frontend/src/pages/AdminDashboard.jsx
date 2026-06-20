@@ -1691,7 +1691,7 @@ function EmployeesPanel() {
 // ── REPORTS PANEL ─────────────────────────────────────────────────────────────
 function ReportsPanel() {
   const [metrics, setMetrics] = useState(null);
-  const [period, setPeriod] = useState('today');
+  const [period, setPeriod] = useState('');
   const [userId, setUserId] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [productId, setProductId] = useState('');
@@ -1792,7 +1792,7 @@ function ReportsPanel() {
                 onChange={(e) => setPeriod(e.target.value)}
                 className="appearance-none bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold py-2.5 px-5 pr-10 rounded-full focus:ring-2 focus:ring-blue-500/20 cursor-pointer outline-none hover:bg-blue-500/15 transition-all"
               >
-                <option value="today" className="bg-gray-900">Select period</option>
+                <option value="" className="bg-gray-900">All</option>
                 <option value="today" className="bg-gray-900">Today</option>
                 <option value="this_week" className="bg-gray-900">This Week</option>
                 <option value="this_month" className="bg-gray-900">This Month</option>
