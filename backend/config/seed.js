@@ -98,11 +98,12 @@ const initDB = async () => {
         for (const floor of floorRows) {
             for (let i = 1; i <= 3; i++) {
                 const tableNum = `${floor.name.charAt(0)}${i}`;
+                const qrToken = `token-${floor.name.replace(/\s+/g, '-').toLowerCase()}-${tableNum.toLowerCase()}`;
                 await pool.query(`
-                    INSERT INTO tables (floor_id, table_number, seats)
-                    SELECT * FROM (SELECT ? AS f, ? AS t, ? AS s) AS tmp
+                    INSERT INTO tables (floor_id, table_number, seats, qr_token)
+                    SELECT * FROM (SELECT ? AS f, ? AS t, ? AS s, ? AS q) AS tmp
                     WHERE NOT EXISTS (SELECT id FROM tables WHERE floor_id = ? AND table_number = ?) LIMIT 1;
-                `, [floor.id, tableNum, i * 2, floor.id, tableNum]);
+                `, [floor.id, tableNum, i * 2, qrToken, floor.id, tableNum]);
             }
         }
 

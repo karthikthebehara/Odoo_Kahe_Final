@@ -56,6 +56,7 @@ CREATE TABLE tables (
     seats INT DEFAULT 2,
     is_active BOOLEAN DEFAULT TRUE,
     status ENUM('available', 'occupied', 'reserved') DEFAULT 'available',
+    qr_token VARCHAR(255) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (floor_id) REFERENCES floors(id) ON DELETE CASCADE,
     UNIQUE KEY unique_table_per_floor (floor_id, table_number)

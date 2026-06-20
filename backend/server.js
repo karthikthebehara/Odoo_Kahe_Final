@@ -50,6 +50,7 @@ app.use('/api', require('./routes/api'));
 // app.use('/api/tables',      require('./routes/tables'));
 // app.use('/api/coupons',     require('./routes/coupons'));
 // app.use('/api/reports',     require('./routes/reports'));
+app.use('/api/self-order',  require('./routes/selfOrder'));
 
 // ─── 404 Handler ────────────────────────────────────────────────────────────
 app.use((req, res) => {
