@@ -103,9 +103,9 @@ export const tablesAPI = {
 };
 
 export const kdsAPI = {
-  list:         (params) => api.get('/api/kds', { params }),
-  updateStatus: (orderId, status) => api.patch(`/api/kds/${orderId}/status`, { status }),
-  updateItem:   (itemId, status)  => api.patch(`/api/kds/items/${itemId}/status`, { status }),
+  list:         (params) => api.get('/api/sync/kds', { params }),
+  updateStatus: (orderId, status) => api.put(`/api/orders/${orderId}/kds`, { kds_status: status }),
+  updateItem:   (orderId, itemId, is_item_completed)  => api.put(`/api/orders/${orderId}/items/${itemId}/complete`, { is_item_completed }),
 };
 
 export const couponsAPI = {
