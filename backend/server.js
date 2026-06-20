@@ -38,15 +38,11 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ─── API Routes ──────────────────────────────────────────────────────────────
-// Central API router — auth, inventory, orders, KDS, and sync endpoints
+// ─── Routes ──────────────────────────────────────────────────────────────────
+// Central API router — orders, KDS, and sync endpoints
 app.use('/api', require('./routes/api'));
 
 // Future route mounts (uncomment as features are implemented):
-// app.use('/api/auth',        require('./routes/auth'));
-// app.use('/api/products',    require('./routes/products'));
-// app.use('/api/categories',  require('./routes/categories'));
-// app.use('/api/orders',      require('./routes/orders'));
 // app.use('/api/customers',   require('./routes/customers'));
 // app.use('/api/employees',   require('./routes/employees'));
 // app.use('/api/payments',    require('./routes/payments'));
