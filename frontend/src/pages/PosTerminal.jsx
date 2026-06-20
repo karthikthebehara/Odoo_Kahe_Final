@@ -36,6 +36,9 @@ const hexToRgba = (hex, alpha = 1) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
+// Image resolution logic lives inside PosTerminal component (see resolveProductImage useCallback)
+// as it needs access to the productImages state fetched from external APIs.
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ICONS (inline SVG — zero dependency)
 // ═══════════════════════════════════════════════════════════════════════════════
