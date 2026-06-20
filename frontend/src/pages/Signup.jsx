@@ -56,6 +56,7 @@ const LockIcon = () => (
 );
 
 const ROLES = [
+  { key: 'customer', label: 'Customer', hint: 'Online / Table Order', icon: '🛍️' },
   { key: 'employee', label: 'Employee', hint: 'Cashier / POS Operator', icon: '🧾' },
   { key: 'admin',    label: 'Admin',    hint: 'Manager / Back-office',  icon: '🛡️' },
 ];
@@ -344,7 +345,7 @@ export default function Signup() {
                   Creating account…
                 </>
               ) : (
-                `Create ${role === 'admin' ? 'Admin' : 'Employee'} Account`
+                `Create ${role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : 'Customer'} Account`
               )}
             </button>
           </form>

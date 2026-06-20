@@ -212,7 +212,29 @@ function CategoryTab({ cat, isActive, onClick }) {
 }
 
 // ── Product Card ─────────────────────────────────────────────────────────────
-function ProductCard({ product, color, cartQty, onAdd }) {
+function ProductCard({ product, color, cartQty, onAdd, coffeeImage, fallbackImage }) {
+  const [imgSrc,    setImgSrc]    = useState(coffeeImage);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgErr,    setImgErr]    = useState(false);
+
+  // If coffeeImage prop changes (API resolves later), reset the src
+  React.useEffect(() => {
+    setImgSrc(coffeeImage);
+    setImgLoaded(false);
+    setImgErr(false);
+  }, [coffeeImage]);
+
+  const handleImgError = () => {
+    // If primary URL broke and we have a fallback, swap to it
+    if (fallbackImage && imgSrc !== fallbackImage) {
+      setImgSrc(fallbackImage);
+      setImgLoaded(false);
+    } else {
+      // Both broke — show the gradient tile
+      setImgErr(true);
+    }
+  };
+
   return (
     <button
       id={`product-card-${product.id}`}
@@ -220,29 +242,71 @@ function ProductCard({ product, color, cartQty, onAdd }) {
       className={[
         'group relative bg-gray-800/70 hover:bg-gray-700/80',
         'border border-gray-700/60 hover:border-gray-500',
-        'rounded-2xl p-4 text-left transition-all duration-200',
-        'hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0',
-        'focus:outline-none focus:ring-2 focus:ring-amber-500/50',
+        'rounded-2xl overflow-hidden text-left transition-all duration-200',
+        'hover:shadow-2xl hover:-translate-y-1 active:translate-y-0',
+        'focus:outline-none focus:ring-2 focus:ring-amber-500/50 flex flex-col',
       ].join(' ')}
     >
-      {/* Category color strip */}
-      <div
-        className="absolute top-0 inset-x-0 h-[3px] rounded-t-2xl"
-        style={{ backgroundColor: color }}
-      />
-
-      {/* Cart badge */}
-      {cartQty > 0 && (
+      {/* ── Top Image Area ───────────────────────────────────────────────── */}
+      <div className="relative w-full h-32 overflow-hidden flex-shrink-0">
+        {/* Colour-strip accent at very top */}
         <div
-          className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md"
+          className="absolute top-0 inset-x-0 h-[3px] z-10"
           style={{ backgroundColor: color }}
-        >
-          {cartQty}
-        </div>
-      )}
+        />
 
-      <div className="mt-1 space-y-2">
-        <p className="text-white font-semibold text-sm leading-tight line-clamp-2 pr-6">
+        {/* Shimmer placeholder — shown while image loads */}
+        {!imgLoaded && !imgErr && (
+          <div
+            className="absolute inset-0 animate-pulse"
+            style={{
+              background: `linear-gradient(135deg, ${hexToRgba(color, 0.25)} 0%, #1f2937 60%, ${hexToRgba(color, 0.15)} 100%)`,
+            }}
+          />
+        )}
+
+        {/* Product image — primary URL, falls back to fallbackImage on error */}
+        {imgSrc && !imgErr ? (
+          <img
+            src={imgSrc}
+            alt={product.name}
+            onLoad={() => setImgLoaded(true)}
+            onError={handleImgError}
+            className={[
+              'w-full h-full object-cover transition-all duration-500',
+              'group-hover:scale-110',
+              imgLoaded ? 'opacity-100' : 'opacity-0',
+            ].join(' ')}
+          />
+        ) : (
+          /* Both URLs failed — show themed gradient tile */
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{
+              background: `linear-gradient(135deg, ${hexToRgba(color, 0.4)} 0%, #111827 100%)`,
+            }}
+          >
+            <Icons.Coffee />
+          </div>
+        )}
+
+        {/* Gradient overlay so text is always readable */}
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-transparent to-transparent" />
+
+        {/* Cart badge — top-right of image */}
+        {cartQty > 0 && (
+          <div
+            className="absolute top-3 right-3 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md"
+            style={{ backgroundColor: color }}
+          >
+            {cartQty}
+          </div>
+        )}
+      </div>
+
+      {/* ── Text Body ────────────────────────────────────────────────────── */}
+      <div className="px-3 pt-2 pb-3 space-y-1.5 flex-1">
+        <p className="text-white font-semibold text-sm leading-tight line-clamp-2">
           {product.name}
         </p>
         <div className="flex items-center justify-between">
@@ -259,7 +323,7 @@ function ProductCard({ product, color, cartQty, onAdd }) {
         )}
       </div>
 
-      {/* Hover add pill */}
+      {/* Hover add pill — bottom-right */}
       <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
         <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow">
           <Icons.Plus size={12} />
@@ -578,9 +642,173 @@ export default function PosTerminal() {
 
   // Dynamic API state
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts]     = useState([]);
   const [dbFloors, setDbFloors]     = useState([]);
   const [activeSession, setActiveSession] = useState(null);
+
+  // ── Unified product-image map: title/keyword (lowercase) → imageUrl ─────────
+  const [productImages, setProductImages] = useState({});
+
+  useEffect(() => {
+    /**
+     * TIER-1  : sampleapis.com — hot coffee items  (title → image)
+     * TIER-2  : TheMealDB     — Dessert + Breakfast categories (strMeal → strMealThumb)
+     * TIER-3  : Curated Unsplash keyword map used as zero-fail fallback in resolveProductImage()
+     *
+     * All three sources are fetched in parallel; failures are silently swallowed
+     * so the UI always has *something* to show.
+     */
+    const fetchAllImages = async () => {
+      const map = {};
+
+      // ── TIER-1 : Coffee API ──────────────────────────────────────────────────
+      try {
+        const [hotRes, icedRes] = await Promise.allSettled([
+          fetch('https://api.sampleapis.com/coffee/hot'),
+          fetch('https://api.sampleapis.com/coffee/iced'),
+        ]);
+        for (const result of [hotRes, icedRes]) {
+          if (result.status === 'fulfilled' && result.value.ok) {
+            const data = await result.value.json();
+            (Array.isArray(data) ? data : []).forEach(item => {
+              if (item.title && item.image) {
+                map[item.title.toLowerCase()] = item.image;
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[ImagePipeline] Coffee API failed:', err.message);
+      }
+
+      // ── TIER-2 : TheMealDB — Dessert & Breakfast ─────────────────────────────
+      try {
+        const [dessertRes, breakfastRes, sideRes] = await Promise.allSettled([
+          fetch('https://www.themealdb.com/api/json/v1/1/filter.php?c=Dessert'),
+          fetch('https://www.themealdb.com/api/json/v1/1/filter.php?c=Breakfast'),
+          fetch('https://www.themealdb.com/api/json/v1/1/filter.php?c=Side'),
+        ]);
+        for (const result of [dessertRes, breakfastRes, sideRes]) {
+          if (result.status === 'fulfilled' && result.value.ok) {
+            const json = await result.value.json();
+            (json.meals || []).forEach(meal => {
+              if (meal.strMeal && meal.strMealThumb) {
+                map[meal.strMeal.toLowerCase()] = meal.strMealThumb;
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[ImagePipeline] TheMealDB failed:', err.message);
+      }
+
+      setProductImages(map);
+    };
+
+    fetchAllImages();
+  }, []);
+
+  /**
+   * TIER-3 : Curated keyword → Unsplash fallback map.
+   * Stable direct Unsplash URLs — no API key, no redirects.
+   *
+   * Special keys prefixed with _cat_ are the category-level defaults used in T3c.
+   *   _cat_beverages → high-quality coffee/drink photo
+   *   _cat_bakery    → high-quality pastry/croissant photo
+   *   _cat_desserts  → high-quality cake/dessert photo
+   */
+  const UNSPLASH_FALLBACKS = {
+    // ── specific keywords ──────────────────────────────────────────────────────
+    croissant:  'https://images.unsplash.com/photo-1555507036-ab1f4038808a?q=80&w=600&auto=format&fit=crop',
+    muffin:     'https://images.unsplash.com/photo-1607958996333-41aef7caefaa?q=80&w=600&auto=format&fit=crop',
+    cake:       'https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=600&auto=format&fit=crop',
+    chocolate:  'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?q=80&w=600&auto=format&fit=crop',
+    cheese:     'https://images.unsplash.com/photo-1562777717-dc6984f65a63?q=80&w=600&auto=format&fit=crop',
+    tart:       'https://images.unsplash.com/photo-1464195157462-3518ca5a2f0a?q=80&w=600&auto=format&fit=crop',
+    pastry:     'https://images.unsplash.com/photo-1484723091739-30a097e8f929?q=80&w=600&auto=format&fit=crop',
+    bread:      'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=600&auto=format&fit=crop',
+    cookie:     'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=600&auto=format&fit=crop',
+    brownie:    'https://images.unsplash.com/photo-1515037893149-de7f840978e2?q=80&w=600&auto=format&fit=crop',
+    donut:      'https://images.unsplash.com/photo-1551024601-bec78aea704b?q=80&w=600&auto=format&fit=crop',
+    waffle:     'https://images.unsplash.com/photo-1562376552-0d160a2f238d?q=80&w=600&auto=format&fit=crop',
+    pancake:    'https://images.unsplash.com/photo-1528207776546-365bb710ee93?q=80&w=600&auto=format&fit=crop',
+    latte:      'https://images.unsplash.com/photo-1561047029-3000c68339ca?q=80&w=600&auto=format&fit=crop',
+    cappuccino: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?q=80&w=600&auto=format&fit=crop',
+    espresso:   'https://images.unsplash.com/photo-1510707577719-ae7c14805e3a?q=80&w=600&auto=format&fit=crop',
+    mocha:      'https://images.unsplash.com/photo-1578314675249-a6910f80cc4e?q=80&w=600&auto=format&fit=crop',
+    americano:  'https://images.unsplash.com/photo-1520031441872-265e4ff70366?q=80&w=600&auto=format&fit=crop',
+    matcha:     'https://images.unsplash.com/photo-1515823064-d6e0c04616a7?q=80&w=600&auto=format&fit=crop',
+    tea:        'https://images.unsplash.com/photo-1556679343-c7306c1976bc?q=80&w=600&auto=format&fit=crop',
+    juice:      'https://images.unsplash.com/photo-1600271886742-f049cd451bba?q=80&w=600&auto=format&fit=crop',
+    smoothie:   'https://images.unsplash.com/photo-1553530979-fbb9e4aee36f?q=80&w=600&auto=format&fit=crop',
+    sandwich:   'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?q=80&w=600&auto=format&fit=crop',
+    salad:      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=600&auto=format&fit=crop',
+    // ── generic keyword keys (still used by T3a/T3b) ──────────────────────────
+    bakery:     'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=600&auto=format&fit=crop',
+    dessert:    'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?q=80&w=600&auto=format&fit=crop',
+    beverage:   'https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=600&auto=format&fit=crop',
+    coffee:     'https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=600&auto=format&fit=crop',
+    // ── T3c category-respected defaults (explicit, high-quality) ──────────────
+    _cat_beverages: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=600&auto=format&fit=crop',
+    _cat_bakery:    'https://images.unsplash.com/photo-1555507036-ab1f4038808a?q=80&w=600&auto=format&fit=crop',
+    _cat_desserts:  'https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=600&auto=format&fit=crop',
+    // ── T3d absolute last-resort ───────────────────────────────────────────────
+    default:    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=600&auto=format&fit=crop',
+  };
+
+  /**
+   * resolveProductImage — four-tier lookup. NEVER returns null/undefined.
+   *
+   * T1  Exact title match in productImages (Coffee API / TheMealDB)
+   * T2  Substring title match in productImages
+   * T3a Exact keyword token match in UNSPLASH_FALLBACKS
+   * T3b Partial keyword token match in UNSPLASH_FALLBACKS
+   * T3c Category-name respected default  ← NEW
+   *       "Beverages"  → premium coffee photo
+   *       "Bakery"     → warm pastry/croissant photo
+   *       "Desserts"   → rich cake/dessert photo
+   * T3d Absolute last-resort default image
+   *
+   * @param {object} product  — { name, ... }
+   * @param {string} catName  — category display name e.g. "Bakery", "Beverages"
+   * @returns {string} image URL
+   */
+  const resolveProductImage = useCallback((product, catName = '') => {
+    const nameLower = product.name.toLowerCase();
+    const catLower  = catName.toLowerCase().trim();
+    const tokens    = [...nameLower.split(/[\s\-_]+/), ...catLower.split(/[\s\-_]+/)].filter(t => t.length >= 3);
+
+    // T1 — exact title match from API datasets
+    if (productImages[nameLower]) return productImages[nameLower];
+
+    // T2 — substring title match from API datasets
+    const apiMatch = Object.entries(productImages).find(
+      ([k]) => nameLower.includes(k) || k.includes(nameLower)
+    )?.[1];
+    if (apiMatch) return apiMatch;
+
+    // T3a — exact keyword token in Unsplash map
+    for (const token of tokens) {
+      if (UNSPLASH_FALLBACKS[token]) return UNSPLASH_FALLBACKS[token];
+    }
+
+    // T3b — partial keyword token in Unsplash map
+    for (const token of tokens) {
+      const partial = Object.entries(UNSPLASH_FALLBACKS).find(
+        ([k]) => !k.startsWith('_cat_') && k !== 'default' && (token.includes(k) || k.includes(token))
+      )?.[1];
+      if (partial) return partial;
+    }
+
+    // T3c — Category-respected default (explicit per-category fallback)
+    if (/beverage|drink|juice|coffee/.test(catLower)) return UNSPLASH_FALLBACKS._cat_beverages;
+    if (/bakery|bread|pastry|bake/.test(catLower))    return UNSPLASH_FALLBACKS._cat_bakery;
+    if (/dessert|sweet|cake|candy/.test(catLower))    return UNSPLASH_FALLBACKS._cat_desserts;
+
+    // T3d — Absolute guaranteed fallback
+    return UNSPLASH_FALLBACKS.default;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productImages]);
 
   // ── Redirect if not logged in ──
   useEffect(() => {
@@ -642,10 +870,41 @@ export default function PosTerminal() {
 
   useEffect(() => {
     if (user) {
-      fetchSession();
+      if (user.role !== 'customer') {
+        fetchSession();
+      }
       fetchCatalogAndTables();
     }
   }, [user, fetchSession, fetchCatalogAndTables]);
+
+  // ── Customer & Table Token auto-resolution ──
+  useEffect(() => {
+    if (user) {
+      const queryParams = new URLSearchParams(window.location.search);
+      const token = queryParams.get('token');
+      if (token) {
+        api.get(`/api/tables/verify-token/${token}`)
+          .then(table => {
+            dispatch({
+              type: 'SET_TABLE',
+              tableId: table.id,
+              label: `${table.floor_name} · ${table.table_number}`
+            });
+          })
+          .catch(err => {
+            console.error('Failed to verify table token:', err);
+          });
+      }
+
+      if (user.role === 'customer') {
+        dispatch({
+          type: 'SET_CUSTOMER',
+          customerId: 'self',
+          name: user.name
+        });
+      }
+    }
+  }, [user]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const catMap = useMemo(
@@ -756,6 +1015,47 @@ export default function PosTerminal() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // ── Sync to Customer Facing Display ─────────────────────────────────────────
+  useEffect(() => {
+    try {
+      let displayState = 'CART';
+      let amount = cart.total;
+      
+      if (showPayment) {
+        displayState = 'PAYMENT';
+        amount = paymentOrder?.total_amount || cart.total;
+      } else if (showReceipt) {
+        displayState = 'THANK_YOU';
+        amount = receiptOrder?.total_amount || 0;
+      }
+      
+      const payload = {
+        state: displayState,
+        cart: {
+          items: cart.items.map(item => ({
+            name: item.name,
+            qty: item.qty,
+            price: item.price,
+          })),
+          subtotal: cart.subtotal,
+          tax: cart.tax,
+          discount: cart.discount,
+          total: amount
+        }
+      };
+      
+      // Save to localStorage for page-load sync
+      localStorage.setItem('odoo_customer_display_state', JSON.stringify(payload));
+      
+      // Post message to BroadcastChannel
+      const bc = new BroadcastChannel('odoo_customer_display');
+      bc.postMessage(payload);
+      bc.close();
+    } catch (e) {
+      console.warn('[Sync] Error synchronizing display:', e);
+    }
+  }, [cart, showPayment, paymentOrder, showReceipt, receiptOrder]);
+
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
@@ -780,13 +1080,15 @@ export default function PosTerminal() {
           <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">
             POS Order
           </span>
-          <button
-            id="nav-table-view"
-            onClick={() => setShowTable(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
-          >
-            <Icons.Table /> Table View
-          </button>
+          {user?.role !== 'customer' && (
+            <button
+              id="nav-table-view"
+              onClick={() => setShowTable(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+            >
+              <Icons.Table /> Table View
+            </button>
+          )}
           <button
             id="nav-orders-btn"
             onClick={() => setShowOrders(true)}
@@ -794,29 +1096,19 @@ export default function PosTerminal() {
           >
             📜 Orders
           </button>
-          <button
-            id="nav-customers-btn"
-            onClick={() => setShowCustomers(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
-          >
-            👥 Customers
-          </button>
+          {user?.role !== 'customer' && (
+            <button
+              id="nav-customers-btn"
+              onClick={() => setShowCustomers(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+            >
+              👥 Customers
+            </button>
+          )}
         </nav>
 
-        {/* Search */}
-        <div className="flex-1 max-w-xs ml-auto relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
-            <Icons.Search />
-          </div>
-          <input
-            id="product-search"
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search products…"
-            className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-amber-500 transition-colors placeholder-gray-600"
-          />
-        </div>
+        {/* ml-auto spacer — pushes table badge + user menu to the right */}
+        <div className="flex-1" />
 
         {/* Table badge */}
         {cart.tableLabel && (
@@ -850,12 +1142,14 @@ export default function PosTerminal() {
                   ⚙️ Admin Dashboard
                 </button>
               )}
-              <button
-                onClick={() => { setShowUserMenu(false); setShowSessionCloseModal(true); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
-              >
-                🔒 Close Shift / Session
-              </button>
+              {user?.role !== 'customer' && (
+                <button
+                  onClick={() => { setShowUserMenu(false); setShowSessionCloseModal(true); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
+                >
+                  🔒 Close Shift / Session
+                </button>
+              )}
               <button
                 onClick={() => { setShowUserMenu(false); logout(); navigate('/login'); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
@@ -878,7 +1172,7 @@ export default function PosTerminal() {
         <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* ── Category Filter Tabs ───────────────────────────────────────── */}
-          <div className="flex-shrink-0 bg-gray-900/50 border-b border-gray-800 px-4 py-3 flex items-center gap-2 overflow-x-auto">
+          <div className="flex-shrink-0 bg-gray-900/50 border-b border-gray-800 px-4 pt-3 pb-0 flex items-center gap-2 overflow-x-auto">
             {/* All Items tab */}
             <button
               id="cat-tab-all"
@@ -903,6 +1197,44 @@ export default function PosTerminal() {
             ))}
           </div>
 
+          {/* ── Inline Search Bar (below category tabs) ────────────────────── */}
+          <div className="flex-shrink-0 bg-gray-900/30 border-b border-gray-800/60 px-4 py-2.5">
+            <div className="relative max-w-full">
+              {/* Search icon */}
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                <Icons.Search />
+              </div>
+              <input
+                id="product-search"
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search menu items… (Cappuccino, Muffin, Cake…)"
+                className={[
+                  'w-full bg-gray-800/80 border text-white text-sm rounded-xl',
+                  'pl-10 pr-10 py-2.5 transition-all duration-200 placeholder-gray-600',
+                  searchQuery
+                    ? 'border-amber-500/70 bg-gray-800 shadow-lg shadow-amber-500/10'
+                    : 'border-gray-700/80 focus:border-amber-500/70 focus:bg-gray-800 focus:shadow-lg focus:shadow-amber-500/10',
+                  'focus:outline-none',
+                ].join(' ')}
+              />
+              {/* Clear button — only visible when query is non-empty */}
+              {searchQuery && (
+                <button
+                  id="search-clear-btn"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  aria-label="Clear search"
+                >
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* ── Product Grid ───────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto p-4">
             {visibleProducts.length === 0 ? (
@@ -913,16 +1245,40 @@ export default function PosTerminal() {
                 <p className="text-sm font-medium">No products match "{searchQuery}"</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {visibleProducts.map(product => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    color={catMap[product.category_id]?.color || '#6366f1'}
-                    cartQty={cartQtyMap[product.id] || 0}
-                    onAdd={handleAddProduct}
-                  />
-                ))}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+                  gap: '14px',
+                }}
+              >
+                {visibleProducts.map(product => {
+                  const catName   = catMap[product.category_id]?.name || '';
+                  const heroImage = resolveProductImage(product, catName);
+
+                  // Category-respected safe fallback for onError in ProductCard
+                  const catLow = catName.toLowerCase();
+                  const fallbackImage =
+                    /beverage|drink|juice|coffee/.test(catLow)
+                      ? UNSPLASH_FALLBACKS._cat_beverages
+                      : /bakery|bread|pastry|bake/.test(catLow)
+                        ? UNSPLASH_FALLBACKS._cat_bakery
+                        : /dessert|sweet|cake|candy/.test(catLow)
+                          ? UNSPLASH_FALLBACKS._cat_desserts
+                          : UNSPLASH_FALLBACKS.default;
+
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      color={catMap[product.category_id]?.color || '#6366f1'}
+                      cartQty={cartQtyMap[product.id] || 0}
+                      onAdd={handleAddProduct}
+                      coffeeImage={heroImage}
+                      fallbackImage={fallbackImage}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -989,25 +1345,29 @@ export default function PosTerminal() {
               <span className="truncate flex items-center gap-1.5 font-medium">
                 👤 Customer: <span className="font-semibold text-white">{cart.customerName}</span>
               </span>
-              <button
-                id="remove-customer-btn"
-                onClick={() => dispatch({ type: 'SET_CUSTOMER', customerId: null, name: '' })}
-                className="text-red-400 hover:text-red-300 font-bold px-1.5"
-              >
-                Clear
-              </button>
+              {user?.role !== 'customer' && (
+                <button
+                  id="remove-customer-btn"
+                  onClick={() => dispatch({ type: 'SET_CUSTOMER', customerId: null, name: '' })}
+                  className="text-red-400 hover:text-red-300 font-bold px-1.5"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           )}
 
           {/* ── Primary Action Buttons ───────────────────────────────────────── */}
           <div className="flex-shrink-0 px-5 py-3 border-t border-gray-800 flex gap-2">
-            <button
-              id="table-view-btn"
-              onClick={() => setShowTable(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold border border-gray-700 hover:border-gray-500 transition-all"
-            >
-              <Icons.Table /> Table
-            </button>
+            {user?.role !== 'customer' && (
+              <button
+                id="table-view-btn"
+                onClick={() => setShowTable(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold border border-gray-700 hover:border-gray-500 transition-all"
+              >
+                <Icons.Table /> Table
+              </button>
+            )}
             <button
               id="discount-btn"
               onClick={() => setShowDiscount(true)}
@@ -1149,7 +1509,7 @@ export default function PosTerminal() {
         />
       )}
 
-      {showSessionOpenModal && (
+      {showSessionOpenModal && user?.role !== 'customer' && (
         <SessionOpenModal
           user={user}
           onSuccess={(session) => {
@@ -1545,6 +1905,7 @@ function CustomersModal({ onSelect, onClose }) {
 }
 
 function OrdersModal({ onPay, onClose }) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -1595,7 +1956,7 @@ function OrdersModal({ onPay, onClose }) {
         <div className="w-full md:w-1/2 border-r border-gray-800 flex flex-col h-full overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-800 flex-shrink-0 flex items-center justify-between">
             <h2 className="text-white font-bold text-lg flex items-center gap-2">
-              📜 Active Shift Orders
+              {user?.role === 'customer' ? '📜 My Orders' : '📜 Active Shift Orders'}
             </h2>
             <button onClick={onClose} className="md:hidden w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
               <Icons.X />
@@ -1646,8 +2007,22 @@ function OrdersModal({ onPay, onClose }) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-white font-bold font-mono text-sm">{o.order_number || `Order #${o.id}`}</span>
-                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${o.status === 'draft' ? 'bg-gray-700 text-gray-300' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
-                      {o.status === 'draft' ? 'Draft' : 'KDS Pending'}
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                      o.status === 'draft'
+                        ? 'bg-gray-700 text-gray-300'
+                        : o.status === 'pending'
+                          ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                          : o.status === 'paid'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    }`}>
+                      {o.status === 'draft'
+                        ? 'Draft'
+                        : o.status === 'pending'
+                          ? 'KDS Pending'
+                          : o.status === 'paid'
+                            ? 'Paid'
+                            : 'Cancelled'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
@@ -1716,20 +2091,24 @@ function OrdersModal({ onPay, onClose }) {
               </div>
 
               {/* Action pane footer */}
-              <div className="p-6 border-t border-gray-800 bg-gray-900 flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => onPay(selectedOrder)}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-xs font-semibold"
-                >
-                  💳 Proceed to Pay
-                </button>
-                <button
-                  onClick={() => handleCancelOrder(selectedOrder.id)}
-                  className="px-5 py-3.5 bg-gray-800 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-500/25 font-semibold rounded-2xl transition-colors text-xs"
-                >
-                  Cancel Order
-                </button>
-              </div>
+              {selectedOrder.status !== 'paid' && selectedOrder.status !== 'cancelled' && (
+                <div className="p-6 border-t border-gray-800 bg-gray-900 flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => onPay(selectedOrder)}
+                    className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-xs font-semibold"
+                  >
+                    💳 Proceed to Pay
+                  </button>
+                  {(user?.role !== 'customer' || selectedOrder.status === 'draft') && (
+                    <button
+                      onClick={() => handleCancelOrder(selectedOrder.id)}
+                      className="px-5 py-3.5 bg-gray-800 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-500/25 font-semibold rounded-2xl transition-colors text-xs"
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8 text-center">

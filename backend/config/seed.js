@@ -29,6 +29,7 @@ const initDB = async () => {
         // 2. Seed Users
         const adminPassword = await bcrypt.hash('admin123', 10);
         const employeePassword = await bcrypt.hash('emp123', 10);
+        const customerPassword = await bcrypt.hash('cust123', 10);
 
         await pool.query(`
             INSERT INTO users (name, email, password, role)
@@ -41,6 +42,12 @@ const initDB = async () => {
             SELECT * FROM (SELECT 'Employee One' AS n, 'employee@odoocafe.com' AS e, ? AS p, 'employee' AS r) AS tmp
             WHERE NOT EXISTS (SELECT email FROM users WHERE email = 'employee@odoocafe.com') LIMIT 1;
         `, [employeePassword]);
+
+        await pool.query(`
+            INSERT INTO users (name, email, password, role)
+            SELECT * FROM (SELECT 'Demo Customer' AS n, 'customer@odoocafe.com' AS e, ? AS p, 'customer' AS r) AS tmp
+            WHERE NOT EXISTS (SELECT email FROM users WHERE email = 'customer@odoocafe.com') LIMIT 1;
+        `, [customerPassword]);
 
         // 3. Seed Categories
         const categories = [
@@ -205,7 +212,8 @@ const initDB = async () => {
         const customersSeed = [
             { name: 'Walk-in Customer', email: 'walkin@odoocafe.com', phone: '0000000000' },
             { name: 'John Doe', email: 'john@example.com', phone: '1234567890' },
-            { name: 'Jane Smith', email: 'jane@example.com', phone: '9876543210' }
+            { name: 'Jane Smith', email: 'jane@example.com', phone: '9876543210' },
+            { name: 'Demo Customer', email: 'customer@odoocafe.com', phone: '1234567890' }
         ];
         for (const cust of customersSeed) {
             await pool.query(`

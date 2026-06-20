@@ -73,6 +73,7 @@ const {
   createTable,
   updateTable,
   deleteTable,
+  verifyTableToken,
 } = require('../controllers/tableController');
 
 const {
@@ -126,19 +127,19 @@ const { verifyToken } = require('../middleware/auth');
  *   items: [{ product_id: number, quantity: number }]
  * }
  */
-router.post('/orders', createOrder);
+router.post('/orders', verifyToken, createOrder);
 
 /**
  * GET /api/orders
  * List all active (draft/pending) orders with their line items.
  */
-router.get('/orders', getOrders);
+router.get('/orders', verifyToken, getOrders);
 
 /**
  * GET /api/orders/:id
  * Fetch a single order by ID with its line items.
  */
-router.get('/orders/:id', getOrderById);
+router.get('/orders/:id', verifyToken, getOrderById);
 
 /**
  * PUT /api/orders/:id/status
@@ -172,7 +173,7 @@ router.put('/orders/:orderId/items/:itemId/complete', updateItemCompletion);
  * POST /api/orders/:id/pay
  * Register payment for an order and free up the table.
  */
-router.post('/orders/:id/pay', payOrder);
+router.post('/orders/:id/pay', verifyToken, payOrder);
 
 // ─── Sync / Polling Routes ───────────────────────────────────────────────────────────────
 
@@ -216,6 +217,7 @@ router.post('/floors', createFloor);
 router.delete('/floors/:id', deleteFloor);
 
 router.get('/tables', getAllTables);
+router.get('/tables/verify-token/:token', verifyTableToken);
 router.post('/tables', createTable);
 router.put('/tables/:id', updateTable);
 router.delete('/tables/:id', deleteTable);

@@ -79,8 +79,37 @@ const createOrder = async (req, res) => {
     items,
   } = req.body;
 
+  let resolvedCustomerId = customer_id;
+  let resolvedSessionId = session_id;
+
+  try {
+    if (req.user && req.user.role === 'customer') {
+      const [custRows] = await pool.query('SELECT id FROM customers WHERE email = ?', [req.user.email]);
+      if (custRows.length > 0) {
+        resolvedCustomerId = custRows[0].id;
+      }
+    }
+
+    if (!resolvedSessionId || (req.user && req.user.role === 'customer')) {
+      const [activeSessions] = await pool.query(
+        "SELECT id FROM sessions WHERE status = 'open' ORDER BY start_time DESC LIMIT 1"
+      );
+      if (activeSessions.length > 0) {
+        resolvedSessionId = activeSessions[0].id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'No active POS session is open. Ordering is temporarily unavailable.'
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error resolving customer or session details:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error resolving order contexts.' });
+  }
+
   // ── Input validation ────────────────────────────────────────────────────────
-  if (!session_id) {
+  if (!resolvedSessionId) {
     return res.status(400).json({ success: false, error: 'session_id is required.' });
   }
   if (!Array.isArray(items) || items.length === 0) {
@@ -314,9 +343,9 @@ const createOrder = async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())`,
       [
         orderNumber,
-        session_id,
+        resolvedSessionId,
         table_id,
-        customer_id || null,
+        resolvedCustomerId || null,
         cartGross,           // pre-discount line sum
         totalDiscount,       // all three tiers combined
         totalTax,
@@ -357,9 +386,9 @@ const createOrder = async (req, res) => {
         order: {
           id:              orderId,
           order_number:    orderNumber,
-          session_id,
+          session_id:      resolvedSessionId,
           table_id,
-          customer_id,
+          customer_id:     resolvedCustomerId,
           status:          'draft',
           subtotal:        cartGross,
           discount_amount: totalDiscount,
@@ -611,14 +640,29 @@ const updateItemCompletion = async (req, res) => {
  */
 const getOrders = async (req, res) => {
   try {
-    const [orders] = await pool.execute(
-      `SELECT id, order_number, session_id, table_id, customer_id,
-              subtotal, discount_amount, tax_amount, total_amount,
-              status, kds_status, payment_method, payment_ref, created_at
-         FROM orders
-        WHERE status IN ('draft', 'pending')
-        ORDER BY created_at ASC`
-    );
+    let query = `
+      SELECT id, order_number, session_id, table_id, customer_id,
+             subtotal, discount_amount, tax_amount, total_amount,
+             status, kds_status, payment_method, payment_ref, created_at
+        FROM orders
+    `;
+    let queryParams = [];
+
+    if (req.user && req.user.role === 'customer') {
+      const [custRows] = await pool.execute('SELECT id FROM customers WHERE email = ?', [req.user.email]);
+      if (custRows.length > 0) {
+        query += ' WHERE customer_id = ?';
+        queryParams.push(custRows[0].id);
+      } else {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      query += ' ORDER BY created_at DESC';
+    } else {
+      query += " WHERE status IN ('draft', 'pending')";
+      query += ' ORDER BY created_at ASC';
+    }
+
+    const [orders] = await pool.execute(query, queryParams);
 
     if (orders.length === 0) {
       return res.status(200).json({ success: true, data: [] });
