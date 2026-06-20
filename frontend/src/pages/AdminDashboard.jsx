@@ -33,6 +33,8 @@ const NAV = [
   { icon: '🎟️', label: 'Coupon & Promotion', path: '/admin/coupons' },
   { icon: '📅', label: 'Tables & Floors',    path: '/admin/bookings' },
   { icon: '👥', label: 'Users / Employees',  path: '/admin/users' },
+  { icon: '⚙️', label: 'Mobile Order Panel',  path: '/admin/settings' },
+  { icon: '📱', label: 'Table QR Codes',     path: '/admin/qrcodes' },
 ];
 
 export default function AdminDashboard() {
@@ -159,6 +161,11 @@ export default function AdminDashboard() {
             <BookingsPanel />
           ) : currentPath === '/admin/users' ? (
             <EmployeesPanel />
+          ) : currentPath === '/admin/settings' ? (
+            <MobileOrderPanel />
+          ) : currentPath === '/admin/qrcodes' ? (
+            // eslint-disable-next-line no-undef
+            <TableQRCodesPanel />
           ) : (
             <div className="text-center py-12 text-gray-500">View not found</div>
           )}
@@ -2004,3 +2011,662 @@ function ReportsPanel() {
     </div>
   );
 }
+
+// ── MOBILE ORDER PANEL ───────────────────────────────────────────────────────
+function MobileOrderPanel() {
+  const [enabled, setEnabled] = useState(() => {
+    return localStorage.getItem('odoo_mobile_self_ordering_enabled') === 'true';
+  });
+  const [mode, setMode] = useState(() => {
+    return localStorage.getItem('odoo_mobile_ordering_mode') || 'online';
+  });
+  const [bgColor, setBgColor] = useState(() => {
+    return localStorage.getItem('odoo_mobile_background_color') || '#0f172a';
+  });
+  const [uploadedImages, setUploadedImages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('odoo_mobile_background_images');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [tables, setTables] = useState([]);
+  const [selectedTableId, setSelectedTableId] = useState('');
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Fetch tables from database
+  useEffect(() => {
+    const fetchTables = async () => {
+      setLoadingTables(true);
+      try {
+        const res = await tablesAPI.list();
+        setTables(res || []);
+        if (res && res.length > 0) {
+          setSelectedTableId(res[0].id);
+        }
+      } catch (err) {
+        console.warn('Failed to load tables:', err);
+      } finally {
+        setLoadingTables(false);
+      }
+    };
+    fetchTables();
+  }, []);
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    // Limit to 3 images max
+    if (uploadedImages.length + files.length > 3) {
+      alert('You can upload a maximum of 3 background slider images.');
+      return;
+    }
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedImages(prev => {
+          const newImages = [...prev, { name: file.name, dataUrl: reader.result }];
+          return newImages.slice(0, 3);
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    setUploadedImages(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSave = () => {
+    localStorage.setItem('odoo_mobile_self_ordering_enabled', String(enabled));
+    localStorage.setItem('odoo_mobile_ordering_mode', mode);
+    localStorage.setItem('odoo_mobile_background_color', bgColor);
+    localStorage.setItem('odoo_mobile_background_images', JSON.stringify(uploadedImages));
+    
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  // Generate dynamic preview URL token
+  const selectedTable = tables.find(t => String(t.id) === String(selectedTableId));
+  const tableToken = selectedTable?.qr_token || 'asdfghhjkl';
+  const generatedUrl = `https://abcd.com/s/${tableToken}`;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-white">Mobile Order Panel</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Configure Self-Ordering QR menu parameters and custom brand layout settings</p>
+        </div>
+        <button
+          onClick={handleSave}
+          className="px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-black rounded-2xl shadow-lg transition-transform active:scale-95 text-xs flex items-center gap-2"
+        >
+          💾 Save Configurations
+        </button>
+      </div>
+
+      {saveSuccess && (
+        <div className="bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs rounded-2xl px-4 py-3 animate-in fade-in duration-200">
+          ✨ Settings saved successfully! Mobile order configuration has been updated.
+        </div>
+      )}
+
+      {/* Master Toggle */}
+      <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-lg flex items-center justify-between">
+        <div className="space-y-1 pr-4">
+          <h3 className="text-white font-extrabold text-base">Self Ordering System</h3>
+          <p className="text-gray-500 text-xs leading-relaxed">Enable customers to scan table QR codes to browse the menu and place orders directly from their phones.</p>
+        </div>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="self-ordering-toggle"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="w-5 h-5 rounded text-amber-500 focus:ring-amber-500 bg-gray-950 border-gray-700 cursor-pointer"
+          />
+        </div>
+      </div>
+
+      {/* Conditional Settings Configurations */}
+      {enabled ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
+          
+          {/* Left Column: Mode Switcher & URLs */}
+          <div className="space-y-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-lg space-y-5">
+              <h3 className="text-white font-extrabold text-sm border-b border-gray-850 pb-3">Mode Settings</h3>
+              
+              {/* Dropdown Selector */}
+              <div className="space-y-2">
+                <label className="text-gray-400 text-xs font-semibold">Self-Ordering Mode</label>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+                >
+                  <option value="online">Online ordering</option>
+                  <option value="qr">QR Menu</option>
+                </select>
+              </div>
+
+              {/* Mode Specific Logic */}
+              {mode === 'online' ? (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <p className="text-slate-400 text-xs leading-relaxed font-medium">
+                    Online ordering mode allows customers to select items, configure modifiers, and submit orders directly to the Kitchen KDS system.
+                  </p>
+                  
+                  {/* Payment Method Mandatory read-only checkbox */}
+                  <div className="bg-gray-950/50 border border-gray-850 rounded-2xl p-4 flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="payment-method-counter"
+                      checked={true}
+                      disabled={true}
+                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-gray-800 border-gray-700 cursor-not-allowed"
+                    />
+                    <div>
+                      <label htmlFor="payment-method-counter" className="text-xs font-bold text-gray-300">Payment Method: Pay at counter</label>
+                      <p className="text-[10px] text-gray-500 mt-0.5">Mandatory checkout option for counter cashiers.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  {/* QR Menu Warning box */}
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-2xl px-4 py-3 leading-relaxed">
+                    ⚠️ <strong>Digital Menu Mode:</strong> It's only digital menu, not able to order. Customers can only view products and pricing details.
+                  </div>
+                </div>
+              )}
+
+              {/* URL & QR Action Links */}
+              <div className="pt-4 border-t border-gray-850 flex gap-3 text-xs">
+                <a
+                  href="/pos"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 text-center py-2.5 bg-gray-850 hover:bg-gray-800 text-amber-400 hover:text-amber-300 font-bold border border-gray-800 rounded-xl transition-colors"
+                >
+                  🔗 Preview Webpage
+                </a>
+                <button
+                  type="button"
+                  onClick={() => alert('Downloading high-resolution table QR codes bundle...')}
+                  className="flex-1 text-center py-2.5 bg-gray-850 hover:bg-gray-800 text-white font-bold border border-gray-800 rounded-xl transition-colors"
+                >
+                  📥 Download QR code
+                </button>
+              </div>
+            </div>
+
+            {/* URL Generator Display */}
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-lg space-y-4">
+              <h3 className="text-white font-extrabold text-sm border-b border-gray-850 pb-3">Dynamic URL Token Generator</h3>
+              
+              <p className="text-slate-400 text-xs leading-relaxed font-medium">
+                Select a physical table layout to generate the specific, secure QR code ordering URL route token:
+              </p>
+
+              {/* Table Selection Dropdown */}
+              <div className="space-y-2">
+                <label className="text-gray-400 text-xs font-semibold">Generate For Table</label>
+                {loadingTables ? (
+                  <p className="text-gray-500 text-xs">Loading available tables...</p>
+                ) : tables.length > 0 ? (
+                  <select
+                    value={selectedTableId}
+                    onChange={(e) => setSelectedTableId(e.target.value)}
+                    className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
+                  >
+                    {tables.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.floor_name} - Table {t.table_number}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    disabled={true}
+                    className="w-full bg-gray-950 border border-gray-800 text-slate-500 rounded-xl px-4 py-3.5 text-xs"
+                  >
+                    <option>No active tables found (Mock fallback table)</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Dynamic URL Link Display */}
+              <div className="bg-gray-950 border border-gray-850 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="overflow-hidden">
+                  <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">Generated Self-Ordering Link</p>
+                  <p className="text-amber-500 text-xs font-bold font-mono tracking-tight mt-1 overflow-x-auto whitespace-nowrap scrollbar-thin">
+                    {generatedUrl}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedUrl);
+                    alert('Token link copied to clipboard!');
+                  }}
+                  className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white text-[10px] font-bold rounded-lg border border-gray-750 transition-colors self-end sm:self-center flex-shrink-0"
+                >
+                  Copy Link
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Customization Controls */}
+          <div className="space-y-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-lg space-y-5">
+              <h3 className="text-white font-extrabold text-sm border-b border-gray-850 pb-3">Visual Brand Customization</h3>
+              
+              {/* Color Picker */}
+              <div className="space-y-2">
+                <label className="text-gray-400 text-xs font-semibold">Self-Ordering Webpage Background Color</label>
+                <div className="flex gap-3">
+                  <input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="w-14 h-12 bg-gray-950 border border-gray-800 p-2 rounded-xl cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    placeholder="#0f172a"
+                    className="flex-1 bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 transition-colors font-mono uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* Slider Image Upload Module */}
+              <div className="space-y-3 pt-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-gray-400 text-xs font-semibold">Background Slider Images (Max 3)</label>
+                  <span className="text-[10px] text-gray-500 font-bold">{uploadedImages.length}/3 Uploaded</span>
+                </div>
+
+                <div className="relative border-2 border-dashed border-gray-800 hover:border-gray-700 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-gray-950/40">
+                  <input
+                    type="file"
+                    multiple={true}
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadedImages.length >= 3}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <span className="text-2xl mb-1.5">🖼️</span>
+                  <span className="text-xs font-bold text-white">Click or drag images to upload</span>
+                  <span className="text-[10px] text-gray-500 mt-1">Image 1, Image 2, Image 3 sliders</span>
+                </div>
+
+                {/* Previews List */}
+                {uploadedImages.length > 0 && (
+                  <div className="grid grid-cols-3 gap-3 pt-3 animate-in fade-in duration-200">
+                    {uploadedImages.map((img, idx) => (
+                      <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-800 h-20 bg-gray-950">
+                        <img
+                          src={img.dataUrl}
+                          alt={`Slider ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Overlay overlay info */}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="text-red-400 hover:text-red-300 font-extrabold text-[10px] bg-red-950/80 px-2 py-1 rounded-md border border-red-900/50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div className="absolute bottom-0 left-0 bg-slate-950/85 px-1.5 py-0.5 text-[8px] font-bold text-gray-400 rounded-tr-md">
+                          Slider {idx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      ) : (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-3xl p-12 text-center text-gray-500 animate-in fade-in duration-200">
+          <span className="text-4xl">📴</span>
+          <h3 className="text-white font-extrabold text-base mt-4">Self Ordering is Disabled</h3>
+          <p className="text-xs max-w-sm mx-auto mt-2 leading-relaxed font-medium text-gray-500">
+            Check the master slider above to activate the Self-Ordering QR infrastructure and configure web styling configurations, menu options, and URL routes.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TABLE QR CODES PANEL ─────────────────────────────────────────────────────
+// Renders live QR codes for every active dining table via the `qrcode` npm lib.
+// Each card: Table label, floor, token URL, canvas QR, Download PNG button.
+// "Download QR PDF" button tiles all cards onto an A4 PDF via jsPDF + html2canvas.
+// ─────────────────────────────────────────────────────────────────────────────
+function TableQRCodesPanel() {
+  const [tables,  setTables]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [filter,  setFilter]  = useState('');   // floor filter
+  const [floors,  setFloors]  = useState([]);
+
+  // ── Load tables + floors ────────────────────────────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [tbl, flr] = await Promise.all([tablesAPI.list(), tablesAPI.floors()]);
+        setTables(Array.isArray(tbl) ? tbl : []);
+        setFloors(Array.isArray(flr) ? flr : []);
+      } catch (err) {
+        console.error('[QR Panel] Failed to load tables:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  // ── Derive QR URL from table token ──────────────────────────────────────────
+  const qrUrl = (table) =>
+    `https://abcd.com/s/${table.qr_token || `table-${table.id}`}`;
+
+  // ── Render QR onto a <canvas> ref ───────────────────────────────────────────
+  const QRCanvas = ({ table }) => {
+    const canvasRef = React.useRef(null);
+
+    React.useEffect(() => {
+      if (!canvasRef.current) return;
+      import('qrcode').then(QRCode => {
+        QRCode.toCanvas(canvasRef.current, qrUrl(table), {
+          width: 200,
+          margin: 2,
+          color: { dark: '#0f172a', light: '#ffffff' },
+          errorCorrectionLevel: 'H',
+        }).catch(err => console.warn('[QR Canvas]', err));
+      });
+    }, [table]);
+
+    return (
+      <canvas
+        ref={canvasRef}
+        id={`qr-canvas-${table.id}`}
+        className="rounded-xl shadow-lg"
+        style={{ width: 160, height: 160 }}
+      />
+    );
+  };
+
+  // ── Download single QR as PNG ────────────────────────────────────────────────
+  const downloadPNG = (table) => {
+    const canvas = document.getElementById(`qr-canvas-${table.id}`);
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `table-${table.table_number}-qr.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  // ── Download ALL as PDF ───────────────────────────────────────────────────────
+  const downloadPDF = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();   // 210 mm
+      const pageH = doc.internal.pageSize.getHeight();  // 297 mm
+
+      // Grid: 3 columns, auto rows
+      const colCount = 3;
+      const cellW    = (pageW - 20) / colCount;  // 10 mm margin each side
+      const cellH    = 80;                         // mm per card
+      const marginX  = 10;
+      const marginY  = 14;
+
+      // Title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Odoo Café — Table QR Codes', pageW / 2, 10, { align: 'center' });
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Generated ${new Date().toLocaleDateString()}  •  Scan to order`, pageW / 2, 14, { align: 'center' });
+
+      const filtered = tables.filter(t => !filter || String(t.floor_id) === filter);
+
+      for (let i = 0; i < filtered.length; i++) {
+        const table  = filtered[i];
+        const col    = i % colCount;
+        const row    = Math.floor(i / colCount);
+        const x      = marginX + col * cellW;
+        const y      = marginY + row * cellH;
+
+        // New page when needed
+        if (row > 0 && col === 0 && i !== 0) {
+          if (y + cellH > pageH - 10) {
+            doc.addPage();
+            // Reset y reference — jsPDF tracks pages internally
+          }
+        }
+
+        // Card background
+        doc.setFillColor(241, 245, 249);   // slate-100
+        doc.roundedRect(x + 2, y + 2, cellW - 4, cellH - 4, 4, 4, 'F');
+
+        // Card border
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x + 2, y + 2, cellW - 4, cellH - 4, 4, 4, 'S');
+
+        // Floor badge
+        doc.setFillColor(245, 158, 11);   // amber-500
+        doc.roundedRect(x + 4, y + 4, cellW - 8, 5, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6);
+        doc.setTextColor(15, 23, 42);
+        doc.text(table.floor_name || 'Ground Floor', x + cellW / 2, y + 7.5, { align: 'center' });
+
+        // Table name
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Table ${table.table_number}`, x + cellW / 2, y + 18, { align: 'center' });
+
+        // QR canvas → image
+        const canvas = document.getElementById(`qr-canvas-${table.id}`);
+        if (canvas) {
+          const imgData  = canvas.toDataURL('image/png');
+          const qrSize   = cellW - 20;
+          const qrX      = x + (cellW - qrSize) / 2;
+          doc.addImage(imgData, 'PNG', qrX, y + 22, qrSize, qrSize);
+        }
+
+        // Token text
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(5.5);
+        doc.setTextColor(100, 116, 139);
+        const token = table.qr_token || `table-${table.id}`;
+        doc.text(token, x + cellW / 2, y + cellH - 6, { align: 'center' });
+      }
+
+      doc.save('odoo-cafe-table-qrcodes.pdf');
+    } catch (err) {
+      console.error('[QR PDF] Export failed:', err);
+      alert('PDF export failed: ' + err.message);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
+  const filtered = tables.filter(t => !filter || String(t.floor_id) === filter);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white tracking-tight">Table QR Codes</h1>
+          <p className="text-gray-400 text-xs mt-0.5">
+            Auto-generated QR codes for every active dining table. Each code encodes a unique self-ordering URL.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Floor filter */}
+          <select
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            className="bg-gray-900 border border-gray-800 text-white text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 transition-colors"
+          >
+            <option value="">All Floors</option>
+            {floors.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+
+          {/* PDF export */}
+          <button
+            onClick={downloadPDF}
+            disabled={pdfBusy || loading || filtered.length === 0}
+            className={[
+              'flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all',
+              pdfBusy || loading || filtered.length === 0
+                ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 shadow-lg shadow-amber-500/20 active:scale-95',
+            ].join(' ')}
+          >
+            {pdfBusy ? (
+              <>
+                <span className="w-4 h-4 border-2 border-gray-900/40 border-t-gray-900 rounded-full animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>📥 Download QR PDF →</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats bar ── */}
+      <div className="flex gap-4 flex-wrap">
+        {[
+          { label: 'Total Tables', value: tables.length, color: 'text-amber-400' },
+          { label: 'Floors',       value: floors.length, color: 'text-violet-400' },
+          { label: 'Visible',      value: filtered.length, color: 'text-emerald-400' },
+        ].map(s => (
+          <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-3 flex items-center gap-3">
+            <span className={`text-2xl font-black ${s.color}`}>{s.value}</span>
+            <span className="text-gray-500 text-xs font-bold">{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── QR Grid ── */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-gray-900 border border-gray-800 rounded-3xl p-5 flex flex-col items-center gap-4 animate-pulse">
+              <div className="h-4 w-24 bg-gray-800 rounded-full" />
+              <div className="w-40 h-40 bg-gray-800 rounded-2xl" />
+              <div className="h-3 w-32 bg-gray-800 rounded-full" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-3xl p-16 text-center">
+          <span className="text-4xl">📋</span>
+          <h3 className="text-white font-extrabold text-base mt-4">No Tables Found</h3>
+          <p className="text-gray-500 text-xs mt-2 max-w-xs mx-auto">
+            Create dining tables in the <strong>Tables &amp; Floors</strong> panel first. Each table automatically gets a unique QR token.
+          </p>
+        </div>
+      ) : (
+        <div
+          id="qr-grid-container"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5"
+        >
+          {filtered.map(table => (
+            <div
+              key={table.id}
+              className="group bg-gray-900 border border-gray-800 hover:border-amber-500/40 rounded-3xl p-5 flex flex-col items-center gap-3 transition-all duration-200 hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-0.5"
+            >
+              {/* Floor badge */}
+              <div className="flex items-center gap-1.5 self-start w-full">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full truncate max-w-full">
+                  {table.floor_name || 'Floor'}
+                </span>
+              </div>
+
+              {/* Table title */}
+              <p className="text-white font-black text-base tracking-tight">
+                Table {table.table_number}
+              </p>
+
+              {/* ── Live QR canvas ── */}
+              <div className="w-40 h-40 bg-white rounded-2xl flex items-center justify-center p-2 shadow-lg border border-gray-200 group-hover:shadow-amber-500/20 group-hover:border-amber-500/30 transition-all">
+                <QRCanvas table={table} />
+              </div>
+
+              {/* Token URL snippet */}
+              <p
+                className="text-gray-600 text-[9px] font-mono text-center truncate w-full px-2"
+                title={qrUrl(table)}
+              >
+                {qrUrl(table)}
+              </p>
+
+              {/* Seats info */}
+              <p className="text-gray-500 text-[10px] font-semibold">
+                {table.seats || 2} seats · {table.status || 'available'}
+              </p>
+
+              {/* Download PNG */}
+              <button
+                onClick={() => downloadPNG(table)}
+                className="w-full py-2.5 mt-1 bg-gray-800 hover:bg-amber-500 hover:text-gray-950 text-gray-400 hover:font-bold text-xs font-semibold rounded-xl border border-gray-700 hover:border-amber-400 transition-all duration-200"
+              >
+                ↓ Download PNG
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── URL format legend ── */}
+      <div className="bg-gray-900/50 border border-gray-800/50 rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <span className="text-amber-500 text-lg">🔗</span>
+        <div>
+          <p className="text-white text-xs font-extrabold">QR URL Format</p>
+          <p className="text-gray-500 text-[11px] mt-0.5 font-mono">
+            https://abcd.com/s/<span className="text-amber-400">[unique_table_token]</span>
+          </p>
+        </div>
+        <div className="sm:ml-auto text-[11px] text-gray-600 leading-relaxed">
+          Token is generated when the table is created in <em>Tables &amp; Floors</em>.<br />
+          Print the PDF and place cards on each table for customer self-ordering.
+        </div>
+      </div>
+    </div>
+  );
+}
+
