@@ -29,6 +29,10 @@ const {
   getOrderById,
 } = require('../controllers/orderController');
 
+const {
+  getDashboardMetrics
+} = require('../controllers/reportController');
+
 // ─── Order Routes ─────────────────────────────────────────────────────────────
 
 /**
@@ -64,5 +68,13 @@ router.get('/orders/:id', getOrderById);
  * If body is omitted, the status is auto-advanced one step forward.
  */
 router.put('/orders/:id/status', updateOrderStatus);
+
+// ─── Reporting Routes ─────────────────────────────────────────────────────────
+
+/**
+ * GET /api/reports/dashboard
+ * Multi-filter admin reporting dashboard metrics.
+ */
+router.get('/reports/dashboard', getDashboardMetrics);
 
 module.exports = router;
