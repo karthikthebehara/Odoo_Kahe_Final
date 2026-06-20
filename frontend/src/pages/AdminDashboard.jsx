@@ -8,8 +8,22 @@ import api, {
   couponsAPI,
   employeesAPI,
   reportsAPI,
+  sessionsAPI,
   tablesAPI
 } from '../utils/api';
+import { SalesAreaChart, CategoryPieChart } from '../components/admin/ReportsCharts';
+import { 
+  Calculator, 
+  FileEdit, 
+  ExternalLink, 
+  User as UserIcon, 
+  Menu, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  Download,
+  Calendar,
+  Filter
+} from 'lucide-react';
 
 const NAV = [
   { icon: '📊', label: 'Reports',            path: '/admin/reports' },
@@ -1671,151 +1685,322 @@ function EmployeesPanel() {
 function ReportsPanel() {
   const [metrics, setMetrics] = useState(null);
   const [period, setPeriod] = useState('today');
+  const [userId, setUserId] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [productId, setProductId] = useState('');
+  
+  const [users, setUsers] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [products, setProducts] = useState([]);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const loadFilterData = useCallback(async () => {
+    try {
+      const [u, s, p] = await Promise.all([
+        employeesAPI.list(),
+        sessionsAPI.list(),
+        productsAPI.list()
+      ]);
+      setUsers(u || []);
+      setSessions(s || []);
+      setProducts(p || []);
+    } catch (err) {
+      console.error('Failed to load filter data:', err);
+    }
+  }, []);
 
   const loadMetrics = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await reportsAPI.dashboard({ period });
+      const res = await reportsAPI.dashboard({ 
+        period, 
+        user_id: userId, 
+        session_id: sessionId, 
+        product_id: productId 
+      });
       setMetrics(res);
     } catch (err) {
       setError(err.message || 'Failed to fetch reporting data.');
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [period, userId, sessionId, productId]);
 
+  useEffect(() => { loadFilterData(); }, [loadFilterData]);
   useEffect(() => { loadMetrics(); }, [loadMetrics]);
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white">Sales & Financial Reporting</h1>
-          <p className="text-gray-400 text-xs mt-0.5">Real-time metrics, product trends, and category distribution</p>
+  const KPICard = ({ title, value, trend, label, colorClass }) => {
+    const isPositive = parseFloat(trend) >= 0;
+    return (
+      <div className="bg-gray-900/40 rounded-3xl p-6 shadow-xl border border-gray-800/50 backdrop-blur-sm flex flex-col justify-between">
+        <p className="text-gray-400 text-sm font-medium">{title}</p>
+        <div className="mt-2 flex items-baseline gap-2">
+          <h2 className="text-3xl font-black text-white">{value}</h2>
         </div>
+        <div className={`mt-4 flex items-center gap-1 text-xs font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+          {Math.abs(trend)}%
+          <span className="text-gray-500 font-normal ml-1">Since last period</span>
+        </div>
+      </div>
+    );
+  };
 
-        {/* Period selection tabs */}
-        <div className="flex bg-gray-900 border border-gray-800 p-1.5 rounded-2xl w-fit flex-shrink-0">
-          {['today', 'this_week', 'this_month'].map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all ${
-                period === p
-                  ? 'bg-amber-500 text-gray-950 shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {p.replace('_', ' ')}
-            </button>
-          ))}
+  return (
+    <div className="flex flex-col h-full bg-gray-950 -m-8 text-white">
+      {/* Header Section */}
+      <div className="bg-gray-950/50 backdrop-blur-md border-b border-gray-800/50 px-8 py-4 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-6">
+          <div className="text-2xl font-black text-amber-500 flex items-center gap-2">
+            <span className="bg-amber-500/10 p-2 rounded-xl text-amber-500 border border-amber-500/20">☕</span>
+            <span className="text-white">Reports</span>
+          </div>
+          <div className="flex items-center gap-4 text-gray-500">
+            <Calculator size={20} className="hover:text-amber-500 transition-colors cursor-pointer" />
+            <FileEdit size={20} className="hover:text-amber-500 transition-colors cursor-pointer" />
+            <ExternalLink size={20} className="hover:text-amber-500 transition-colors cursor-pointer" />
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-gray-900 border border-gray-800 rounded-2xl flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer">
+            <UserIcon size={20} />
+          </div>
+          <div className="w-10 h-10 border border-gray-800 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-gray-900 hover:text-white transition-all cursor-pointer">
+            <Menu size={20} />
+          </div>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-xl px-4 py-3">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-12 text-gray-500">Generating analytics metrics...</div>
-      ) : metrics ? (
-        <div className="space-y-8">
-          {/* KPI Dashboard summaries */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2 relative overflow-hidden shadow-lg">
-              <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
-              <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Gross Shift Sales</p>
-              <h2 className="text-white font-black text-3xl tabular-nums">₹{Number(metrics.summary?.total_revenue || 0).toFixed(2)}</h2>
-              <p className="text-[10px] text-gray-400 font-semibold mt-1">Sum of all Paid invoices during period</p>
+      {/* Main Content Scrollable Area */}
+      <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+        {/* Filters and Export */}
+        <div className="flex flex-wrap items-center justify-between gap-6 pb-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <select 
+                value={period} 
+                onChange={(e) => setPeriod(e.target.value)}
+                className="appearance-none bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold py-2.5 px-5 pr-10 rounded-full focus:ring-2 focus:ring-blue-500/20 cursor-pointer outline-none hover:bg-blue-500/15 transition-all"
+              >
+                <option value="today" className="bg-gray-900">Select period</option>
+                <option value="today" className="bg-gray-900">Today</option>
+                <option value="this_week" className="bg-gray-900">This Week</option>
+                <option value="this_month" className="bg-gray-900">This Month</option>
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-blue-400 text-[10px]">▼</div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2 relative overflow-hidden shadow-lg">
-              <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
-              <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Checkout Transactions</p>
-              <h2 className="text-white font-black text-3xl tabular-nums">{metrics.summary?.total_orders}</h2>
-              <p className="text-[10px] text-gray-400 font-semibold mt-1">Paid ticket volumes finalized</p>
+            <div className="relative">
+              <select 
+                value={userId} 
+                onChange={(e) => setUserId(e.target.value)}
+                className="appearance-none bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-bold py-2.5 px-5 pr-10 rounded-full focus:ring-2 focus:ring-pink-500/20 cursor-pointer outline-none hover:bg-pink-500/15 transition-all"
+              >
+                <option value="" className="bg-gray-900">User</option>
+                {users.map(u => <option key={u.id} value={u.id} className="bg-gray-900">{u.name}</option>)}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-pink-400 text-[10px]">▼</div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2 relative overflow-hidden shadow-lg">
-              <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-amber-400 to-orange-500" />
-              <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Average Ticket Value</p>
-              <h2 className="text-white font-black text-3xl tabular-nums">₹{Number(metrics.summary?.average_order_value || 0).toFixed(2)}</h2>
-              <p className="text-[10px] text-gray-400 font-semibold mt-1">Expected ticket size per customer</p>
+            <div className="relative">
+              <select 
+                value={sessionId} 
+                onChange={(e) => setSessionId(e.target.value)}
+                className="appearance-none bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold py-2.5 px-5 pr-10 rounded-full focus:ring-2 focus:ring-purple-500/20 cursor-pointer outline-none hover:bg-purple-500/15 transition-all"
+              >
+                <option value="" className="bg-gray-900">Session</option>
+                {sessions.map(s => <option key={s.id} value={s.id} className="bg-gray-900">#{s.id} - {new Date(s.start_time).toLocaleDateString()}</option>)}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-purple-400 text-[10px]">▼</div>
             </div>
+
+            <div className="relative">
+              <select 
+                value={productId} 
+                onChange={(e) => setProductId(e.target.value)}
+                className="appearance-none bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold py-2.5 px-5 pr-10 rounded-full focus:ring-2 focus:ring-indigo-500/20 cursor-pointer outline-none hover:bg-indigo-500/15 transition-all"
+              >
+                <option value="" className="bg-gray-900">Product</option>
+                {products.map(p => <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>)}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400 text-[10px]">▼</div>
+            </div>
+            
+            <button className="text-gray-500 hover:text-white transition-colors p-2 hover:bg-gray-900 rounded-xl">
+              <Calendar size={18} />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Top Products visual chart */}
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 space-y-6 shadow-lg">
-              <div>
-                <h3 className="text-white font-black text-base">Top 10 Selling Products</h3>
-                <p className="text-gray-500 text-xs">Products sorted by sales volumes</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <button className="flex flex-col items-center bg-gray-900 border border-gray-800 p-2.5 rounded-2xl text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 hover:border-gray-700 transition-all w-14 group">
+              <Download size={14} className="mb-1 group-hover:scale-110 transition-transform" />
+              PDF
+            </button>
+            <button className="flex flex-col items-center bg-gray-900 border border-gray-800 p-2.5 rounded-2xl text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 hover:border-gray-700 transition-all w-14 group">
+              <Download size={14} className="mb-1 group-hover:scale-110 transition-transform" />
+              XLS
+            </button>
+          </div>
+        </div>
 
-              <div className="space-y-4">
-                {metrics.charts?.top_products && metrics.charts.top_products.length > 0 ? (
-                  metrics.charts.top_products.map((p, idx) => {
-                    const maxRev = parseFloat(metrics.charts.top_products[0]?.revenue || 1);
-                    const percentage = (parseFloat(p.revenue) / maxRev) * 100;
-                    return (
-                      <div key={idx} className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-semibold">
-                          <span className="text-white">{p.product_name} <span className="text-gray-500 text-[10px] font-bold">({p.total_quantity} sold)</span></span>
-                          <span className="text-amber-400 font-bold">₹{Number(p.revenue).toFixed(2)}</span>
-                        </div>
-                        {/* CSS Progress Bar */}
-                        <div className="w-full h-2.5 bg-gray-950 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${percentage}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-gray-500 text-xs py-6 text-center">No sales logged during this period.</p>
-                )}
+        {loading ? (
+          <div className="h-64 flex flex-col items-center justify-center text-gray-500 font-medium animate-pulse">
+            <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mb-4"></div>
+            Generating analytics metrics...
+          </div>
+        ) : metrics ? (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-12 pb-12">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <KPICard 
+                title="Total Order" 
+                value={metrics.summary.total_orders} 
+                trend={metrics.summary.total_orders_trend} 
+              />
+              <KPICard 
+                title="Revenue" 
+                value={`₹${Number(metrics.summary.total_revenue).toFixed(0)}`} 
+                trend={metrics.summary.total_revenue_trend} 
+              />
+              <KPICard 
+                title="Average Order" 
+                value={`₹${Number(metrics.summary.average_order_value).toFixed(0)}`} 
+                trend={metrics.summary.average_order_value_trend} 
+              />
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-white border-b-4 border-blue-500/40 pb-2">Sales Forecast</h3>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-black uppercase tracking-tighter">Live</span>
+                </div>
+                <div className="bg-gray-900/40 rounded-[2rem] p-6 border border-gray-800/80 shadow-2xl backdrop-blur-sm">
+                  <SalesAreaChart data={metrics.charts.sales_trend} />
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-white border-b-4 border-amber-500/40 pb-2">Category Distribution</h3>
+                  <span className="text-[10px] bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full border border-amber-500/20 font-black uppercase tracking-tighter">Volume</span>
+                </div>
+                <div className="bg-gray-900/40 rounded-[2rem] p-6 border border-gray-800/80 shadow-2xl backdrop-blur-sm">
+                  <CategoryPieChart data={metrics.charts.top_categories} />
+                </div>
               </div>
             </div>
 
-            {/* Top Categories visual chart */}
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 space-y-6 shadow-lg">
-              <div>
-                <h3 className="text-white font-black text-base">Sales Distribution by Category</h3>
-                <p className="text-gray-500 text-xs">Sales percentage categorized</p>
+            {/* Detailed Tables */}
+            <div className="space-y-10">
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-white border-b-4 border-emerald-500/40 w-fit pb-2">Recent Transactions</h3>
+                <div className="bg-gray-950 border border-gray-800 rounded-[2rem] overflow-hidden shadow-2xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-900/50">
+                        <tr className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800/50">
+                          <th className="px-8 py-5">Order</th>
+                          <th className="px-8 py-5">Sessions</th>
+                          <th className="px-8 py-5">Point of Sale</th>
+                          <th className="px-8 py-5">Date</th>
+                          <th className="px-8 py-5">Customer</th>
+                          <th className="px-8 py-5">Employee</th>
+                          <th className="px-8 py-5 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/30 text-xs">
+                        {metrics.charts.top_orders.map(o => (
+                          <tr key={o.id} className="hover:bg-gray-900/40 transition-all duration-300 group">
+                            <td className="px-8 py-5 font-black text-blue-400 group-hover:pl-10 transition-all">{o.order_number || `#${o.id}`}</td>
+                            <td className="px-8 py-5 text-gray-400 font-medium flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-blue-500/40"></span>
+                              POS/{String(o.session_id).padStart(5, '0')}
+                            </td>
+                            <td className="px-8 py-5 text-gray-400">Main Shop</td>
+                            <td className="px-8 py-5 text-gray-500">{new Date(o.date).toLocaleDateString()}</td>
+                            <td className="px-8 py-5 text-gray-300 font-bold">{o.customer_name || 'Walk-in'}</td>
+                            <td className="px-8 py-5">
+                              <span className="bg-gray-900 px-3 py-1 rounded-lg border border-gray-800 text-gray-400">{o.employee_name}</span>
+                            </td>
+                            <td className="px-8 py-5 text-right font-black text-white text-base">₹{Number(o.total).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                {metrics.charts?.top_categories && metrics.charts.top_categories.length > 0 ? (
-                  metrics.charts.top_categories.map((c, idx) => {
-                    const totalRevenue = parseFloat(metrics.summary?.total_revenue || 1);
-                    const percentage = (parseFloat(c.revenue) / totalRevenue) * 100;
-                    return (
-                      <div key={idx} className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-semibold">
-                          <span className="text-white">{c.category_name} <span className="text-gray-500 text-[10px] font-bold">({c.total_items} items)</span></span>
-                          <span className="text-amber-400 font-bold">{percentage.toFixed(1)}%</span>
-                        </div>
-                        {/* CSS Progress Bar */}
-                        <div className="w-full h-2.5 bg-gray-950 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full" style={{ width: `${percentage}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-gray-500 text-xs py-6 text-center">No sales logged during this period.</p>
-                )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-white border-b-4 border-blue-500/40 w-fit pb-2">Top Performance Products</h3>
+                  <div className="bg-gray-950 border border-gray-800 rounded-[2rem] overflow-hidden shadow-2xl">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-900/50">
+                        <tr className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800/50">
+                          <th className="px-8 py-5">Product</th>
+                          <th className="px-8 py-5">Qty Sold</th>
+                          <th className="px-8 py-5 text-right">Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/30 text-xs font-semibold">
+                        {metrics.charts.top_products.slice(0, 5).map((p, idx) => (
+                          <tr key={idx} className="hover:bg-gray-900/40 transition-all">
+                            <td className="px-8 py-5 text-gray-100 flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 text-[10px] font-black">{idx + 1}</div>
+                              {p.product_name}
+                            </td>
+                            <td className="px-8 py-5 text-gray-400 bg-gray-900/20">{p.total_quantity} units</td>
+                            <td className="px-8 py-5 text-right font-black text-amber-500 text-sm">₹{Number(p.revenue).toFixed(0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-white border-b-4 border-amber-500/40 w-fit pb-2">Category Performance</h3>
+                  <div className="bg-gray-950 border border-gray-800 rounded-[2rem] overflow-hidden shadow-2xl">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-900/50">
+                        <tr className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800/50">
+                          <th className="px-8 py-5">Category</th>
+                          <th className="px-8 py-5 text-right">Revenue Share</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/30 text-xs font-semibold">
+                        {metrics.charts.top_categories.slice(0, 5).map((c, idx) => (
+                          <tr key={idx} className="hover:bg-gray-900/40 transition-all">
+                            <td className="px-8 py-5 text-gray-100 uppercase tracking-widest text-[10px]">{c.category_name}</td>
+                            <td className="px-8 py-5 text-right">
+                              <div className="flex flex-col items-end">
+                                <span className="font-black text-white text-sm">₹{Number(c.revenue).toFixed(0)}</span>
+                                <span className="text-[9px] text-gray-500 mt-0.5">{(parseFloat(c.revenue) / parseFloat(metrics.summary.total_revenue) * 100).toFixed(1)}% share</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="text-center py-12 text-gray-500">Failed to render dashboard analytics.</div>
-      )}
+        ) : (
+          <div className="text-center py-24 text-gray-500 flex flex-col items-center">
+            <span className="text-6xl mb-6">📉</span>
+            <p className="text-xl font-bold text-gray-300">Data Synchronization Problem</p>
+            <p className="text-sm mt-2 text-gray-500 max-w-xs">We couldn't retrieve the latest dashboard metrics from the cloud. Please verify your connection.</p>
+            <button onClick={loadMetrics} className="mt-8 px-6 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-all">Retry Sync</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

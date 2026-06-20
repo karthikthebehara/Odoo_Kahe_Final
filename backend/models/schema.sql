@@ -4,8 +4,7 @@
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Users Table
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -17,8 +16,7 @@ CREATE TABLE users (
 ) ENGINE=InnoDB;
 
 -- 2. Categories Table
-DROP TABLE IF EXISTS categories;
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     color VARCHAR(7) DEFAULT '#3498db',
@@ -26,8 +24,7 @@ CREATE TABLE categories (
 ) ENGINE=InnoDB;
 
 -- 3. Products Table
-DROP TABLE IF EXISTS products;
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     category_id INT,
@@ -41,16 +38,14 @@ CREATE TABLE products (
 ) ENGINE=InnoDB;
 
 -- 4. Floors Table
-DROP TABLE IF EXISTS floors;
-CREATE TABLE floors (
+CREATE TABLE IF NOT EXISTS floors (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- 5. Tables Table
-DROP TABLE IF EXISTS tables;
-CREATE TABLE tables (
+CREATE TABLE IF NOT EXISTS tables (
     id INT AUTO_INCREMENT PRIMARY KEY,
     floor_id INT,
     table_number VARCHAR(10) NOT NULL,
@@ -64,8 +59,7 @@ CREATE TABLE tables (
 ) ENGINE=InnoDB;
 
 -- 6. Promotions Table (Three-tier promotion engine)
-DROP TABLE IF EXISTS promotions;
-CREATE TABLE promotions (
+CREATE TABLE IF NOT EXISTS promotions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     type ENUM('coupon', 'automated_product', 'automated_order') NOT NULL,
@@ -83,8 +77,7 @@ CREATE TABLE promotions (
 ) ENGINE=InnoDB;
 
 -- 7. Sessions Table (for Shift Management)
-DROP TABLE IF EXISTS sessions;
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -97,8 +90,7 @@ CREATE TABLE sessions (
 ) ENGINE=InnoDB;
 
 -- 8. Customers Table
-DROP TABLE IF EXISTS customers;
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) DEFAULT NULL,
@@ -108,8 +100,7 @@ CREATE TABLE customers (
 ) ENGINE=InnoDB;
 
 -- 9. Payment Methods Table
-DROP TABLE IF EXISTS payment_methods;
-CREATE TABLE payment_methods (
+CREATE TABLE IF NOT EXISTS payment_methods (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
     type ENUM('cash', 'card', 'upi') NOT NULL,
@@ -119,8 +110,7 @@ CREATE TABLE payment_methods (
 ) ENGINE=InnoDB;
 
 -- 10. Orders Table
-DROP TABLE IF EXISTS orders;
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_number VARCHAR(20) DEFAULT NULL,
     session_id INT,
@@ -141,8 +131,7 @@ CREATE TABLE orders (
 ) ENGINE=InnoDB;
 
 -- 11. Order Items Table
-DROP TABLE IF EXISTS order_items;
-CREATE TABLE order_items (
+CREATE TABLE IF NOT EXISTS order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
     product_id INT,

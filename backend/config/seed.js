@@ -9,6 +9,13 @@ const path = require('path');
  */
 const initDB = async () => {
     try {
+        // Check if database is already initialized by checking for users table
+        const [tables] = await pool.query("SHOW TABLES LIKE 'users'");
+        if (tables.length > 0) {
+            console.log('ℹ️  Database already initialized. Skipping schema/seed.');
+            return;
+        }
+
         console.log('🔄 Initializing database structure...');
         
         // 1. Read and execute schema.sql

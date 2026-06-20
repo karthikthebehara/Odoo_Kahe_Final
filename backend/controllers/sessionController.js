@@ -182,9 +182,24 @@ const getSessionSummary = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/sessions
+ * Returns a list of all sessions.
+ */
+const getAllSessions = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM sessions ORDER BY start_time DESC');
+    return res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Get all sessions error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to retrieve sessions' });
+  }
+};
+
 module.exports = {
   getActiveSession,
   openSession,
   closeSession,
-  getSessionSummary
+  getSessionSummary,
+  getAllSessions
 };

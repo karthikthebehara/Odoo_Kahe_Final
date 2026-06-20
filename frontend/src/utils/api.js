@@ -138,6 +138,12 @@ export const paymentMethodsAPI = {
   delete: (id)     => api.delete(`/api/payment-methods/${id}`),
 };
 
+export const sessionsAPI = {
+  list: () => api.get('/api/sessions'),
+  active: () => api.get('/api/sessions/active'),
+  summary: (id) => api.get(`/api/sessions/${id}/summary`),
+};
+
 export const reportsAPI = {
   dashboard: (params) => api.get('/api/reports/dashboard', { params }),
 };
