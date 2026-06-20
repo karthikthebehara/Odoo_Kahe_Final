@@ -1700,7 +1700,7 @@ function ReportsPanel() {
   const [products, setProducts] = useState([]);
   
   const [loading, setLoading] = useState(false);
-  const [, setError] = useState(''); // kept for future error display
+  const [error, setError] = useState(''); // kept for future error display
 
   const loadFilterData = useCallback(async () => {
     try {
