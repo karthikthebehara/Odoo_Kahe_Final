@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { testConnection } = require('./config/db');
+const { initDB } = require('./config/seed');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -71,8 +72,10 @@ app.listen(PORT, async () => {
   console.log(`🚀 Odoo Cafe POS backend listening on http://localhost:${PORT}`);
   try {
     await testConnection();
-  } catch {
-    console.warn('⚠️  Server started but database is not connected. Check your .env settings.');
+    await initDB();
+    console.log('✨ System is ready for development.');
+  } catch (error) {
+    console.warn('⚠️  Database initialization failed. Check your MySQL server and .env settings.');
   }
 });
 
