@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "seed": "node config/seed.js",
+    "schema": "node -e \"require('fs').readFileSync('./models/schema.sql','utf8').split(';').filter(s=>s.trim()).forEach(s=>console.log(s+';'))\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

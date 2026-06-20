@@ -39,19 +39,17 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ─── Route Placeholders ──────────────────────────────────────────────────────
-// Routes will be mounted here as they are implemented:
-// app.use('/api/auth',        require('./routes/auth'));
-// app.use('/api/products',    require('./routes/products'));
-// app.use('/api/categories',  require('./routes/categories'));
-// app.use('/api/orders',      require('./routes/orders'));
+// ─── Routes ──────────────────────────────────────────────────────────────────
+// Central API router — orders, KDS, and sync endpoints
+app.use('/api', require('./routes/api'));
+
+// Future route mounts (uncomment as features are implemented):
 // app.use('/api/customers',   require('./routes/customers'));
 // app.use('/api/employees',   require('./routes/employees'));
 // app.use('/api/payments',    require('./routes/payments'));
 // app.use('/api/tables',      require('./routes/tables'));
 // app.use('/api/coupons',     require('./routes/coupons'));
 // app.use('/api/reports',     require('./routes/reports'));
-// app.use('/api/kds',         require('./routes/kds'));
 
 // ─── 404 Handler ────────────────────────────────────────────────────────────
 app.use((req, res) => {
