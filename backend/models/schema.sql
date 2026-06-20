@@ -93,7 +93,7 @@ CREATE TABLE orders (
     session_id INT,
     table_id INT,
     total_amount DECIMAL(10, 2) DEFAULT 0.00,
-    status EN_ENUM('draft', 'pending', 'paid', 'cancelled') DEFAULT 'draft',
+    status ENUM('draft', 'pending', 'paid', 'cancelled') DEFAULT 'draft',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
     FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE SET NULL

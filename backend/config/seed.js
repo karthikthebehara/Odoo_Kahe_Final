@@ -36,13 +36,13 @@ const initDB = async () => {
 
         await pool.query(`
             INSERT INTO users (name, email, password, role)
-            SELECT * FROM (SELECT 'Admin User', 'admin@odoocafe.com', ?, 'admin') AS tmp
+            SELECT * FROM (SELECT 'Admin User' AS n, 'admin@odoocafe.com' AS e, ? AS p, 'admin' AS r) AS tmp
             WHERE NOT EXISTS (SELECT email FROM users WHERE email = 'admin@odoocafe.com') LIMIT 1;
         `, [adminPassword]);
 
         await pool.query(`
             INSERT INTO users (name, email, password, role)
-            SELECT * FROM (SELECT 'Employee One', 'employee@odoocafe.com', ?, 'employee') AS tmp
+            SELECT * FROM (SELECT 'Employee One' AS n, 'employee@odoocafe.com' AS e, ? AS p, 'employee' AS r) AS tmp
             WHERE NOT EXISTS (SELECT email FROM users WHERE email = 'employee@odoocafe.com') LIMIT 1;
         `, [employeePassword]);
 
@@ -56,7 +56,7 @@ const initDB = async () => {
         for (const [name, color] of categories) {
             await pool.query(`
                 INSERT INTO categories (name, color)
-                SELECT * FROM (SELECT ?, ?) AS tmp
+                SELECT * FROM (SELECT ? AS n, ? AS c) AS tmp
                 WHERE NOT EXISTS (SELECT name FROM categories WHERE name = ?) LIMIT 1;
             `, [name, color, name]);
         }
@@ -78,7 +78,7 @@ const initDB = async () => {
         for (const [name, catId, price, uom, tax, desc] of products) {
             await pool.query(`
                 INSERT INTO products (name, category_id, price, uom, tax, description)
-                SELECT * FROM (SELECT ?, ?, ?, ?, ?, ?) AS tmp
+                SELECT * FROM (SELECT ? AS n, ? AS c, ? AS p, ? AS u, ? AS t, ? AS d) AS tmp
                 WHERE NOT EXISTS (SELECT name FROM products WHERE name = ?) LIMIT 1;
             `, [name, catId, price, uom, tax, desc, name]);
         }
@@ -88,7 +88,7 @@ const initDB = async () => {
         for (const floorName of floors) {
             await pool.query(`
                 INSERT INTO floors (name)
-                SELECT * FROM (SELECT ?) AS tmp
+                SELECT * FROM (SELECT ? AS n) AS tmp
                 WHERE NOT EXISTS (SELECT name FROM floors WHERE name = ?) LIMIT 1;
             `, [floorName, floorName]);
         }
@@ -100,7 +100,7 @@ const initDB = async () => {
                 const tableNum = `${floor.name.charAt(0)}${i}`;
                 await pool.query(`
                     INSERT INTO tables (floor_id, table_number, seats)
-                    SELECT * FROM (SELECT ?, ?, ?) AS tmp
+                    SELECT * FROM (SELECT ? AS f, ? AS t, ? AS s) AS tmp
                     WHERE NOT EXISTS (SELECT id FROM tables WHERE floor_id = ? AND table_number = ?) LIMIT 1;
                 `, [floor.id, tableNum, i * 2, floor.id, tableNum]);
             }
