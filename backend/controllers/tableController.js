@@ -118,6 +118,32 @@ const deleteTable = async (req, res) => {
   }
 };
 
+const verifyTableToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Table token is required' });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT t.*, f.name AS floor_name 
+       FROM tables t
+       JOIN floors f ON t.floor_id = f.id
+       WHERE t.qr_token = ? LIMIT 1`,
+      [token]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Invalid or expired table token.' });
+    }
+
+    return res.status(200).json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Verify table token error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to verify table token' });
+  }
+};
+
 module.exports = {
   getAllFloors,
   createFloor,
@@ -125,5 +151,6 @@ module.exports = {
   getAllTables,
   createTable,
   updateTable,
-  deleteTable
+  deleteTable,
+  verifyTableToken
 };

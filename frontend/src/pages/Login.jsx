@@ -32,6 +32,7 @@ const EyeIcon = ({ show }) => (
 );
 
 const ROLES = [
+  { key: 'customer', label: 'Customer', hint: 'Online / Table Order' },
   { key: 'employee', label: 'Employee', hint: 'Cashier / POS Operator' },
   { key: 'admin',    label: 'Admin',    hint: 'Manager / Back-office'  },
 ];
@@ -173,7 +174,7 @@ export default function Login() {
                   Signing in…
                 </>
               ) : (
-                `Sign in as ${role === 'admin' ? 'Admin' : 'Employee'}`
+                `Sign in as ${role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : 'Customer'}`
               )}
             </button>
           </form>
@@ -183,6 +184,7 @@ export default function Login() {
             <p className="font-semibold text-gray-300 mb-1">Demo credentials</p>
             <p>Admin:    <span className="text-amber-400 font-mono">admin@odoocafe.com / admin123</span></p>
             <p>Cashier:  <span className="text-amber-400 font-mono">employee@odoocafe.com / emp123</span></p>
+            <p>Customer: <span className="text-amber-400 font-mono">customer@odoocafe.com / cust123</span></p>
           </div>
 
           {/* Signup link */}

@@ -24,7 +24,7 @@ const signup = async (req, res) => {
     }
 
     // ── Validate role if provided ──
-    const allowedRoles = ['admin', 'employee'];
+    const allowedRoles = ['admin', 'employee', 'customer'];
     const userRole = role ? role.toLowerCase() : 'employee';
 
     if (!allowedRoles.includes(userRole)) {
@@ -55,6 +55,19 @@ const signup = async (req, res) => {
       'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
       [name, email, hashedPassword, userRole]
     );
+
+    if (userRole === 'customer') {
+      const [existingCust] = await pool.query(
+        'SELECT id FROM customers WHERE email = ?',
+        [email]
+      );
+      if (existingCust.length === 0) {
+        await pool.query(
+          'INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)',
+          [name, email, req.body.phone || null]
+        );
+      }
+    }
 
     return res.status(201).json({
       success: true,
@@ -129,6 +142,7 @@ const login = async (req, res) => {
     const payload = {
       id: user.id,
       name: user.name,
+      email: user.email,
       role: user.role,
     };
 

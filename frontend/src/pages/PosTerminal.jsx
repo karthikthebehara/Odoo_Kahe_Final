@@ -36,6 +36,9 @@ const hexToRgba = (hex, alpha = 1) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
+// Image resolution logic lives inside PosTerminal component (see resolveProductImage useCallback)
+// as it needs access to the productImages state fetched from external APIs.
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ICONS (inline SVG — zero dependency)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -870,10 +873,41 @@ export default function PosTerminal() {
 
   useEffect(() => {
     if (user) {
-      fetchSession();
+      if (user.role !== 'customer') {
+        fetchSession();
+      }
       fetchCatalogAndTables();
     }
   }, [user, fetchSession, fetchCatalogAndTables]);
+
+  // ── Customer & Table Token auto-resolution ──
+  useEffect(() => {
+    if (user) {
+      const queryParams = new URLSearchParams(window.location.search);
+      const token = queryParams.get('token');
+      if (token) {
+        api.get(`/api/tables/verify-token/${token}`)
+          .then(table => {
+            dispatch({
+              type: 'SET_TABLE',
+              tableId: table.id,
+              label: `${table.floor_name} · ${table.table_number}`
+            });
+          })
+          .catch(err => {
+            console.error('Failed to verify table token:', err);
+          });
+      }
+
+      if (user.role === 'customer') {
+        dispatch({
+          type: 'SET_CUSTOMER',
+          customerId: 'self',
+          name: user.name
+        });
+      }
+    }
+  }, [user]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const catMap = useMemo(
@@ -1049,13 +1083,15 @@ export default function PosTerminal() {
           <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">
             POS Order
           </span>
-          <button
-            id="nav-table-view"
-            onClick={() => setShowTable(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
-          >
-            <Icons.Table /> Table View
-          </button>
+          {user?.role !== 'customer' && (
+            <button
+              id="nav-table-view"
+              onClick={() => setShowTable(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+            >
+              <Icons.Table /> Table View
+            </button>
+          )}
           <button
             id="nav-orders-btn"
             onClick={() => setShowOrders(true)}
@@ -1063,13 +1099,15 @@ export default function PosTerminal() {
           >
             📜 Orders
           </button>
-          <button
-            id="nav-customers-btn"
-            onClick={() => setShowCustomers(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
-          >
-            👥 Customers
-          </button>
+          {user?.role !== 'customer' && (
+            <button
+              id="nav-customers-btn"
+              onClick={() => setShowCustomers(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+            >
+              👥 Customers
+            </button>
+          )}
         </nav>
 
         {/* ml-auto spacer — pushes table badge + user menu to the right */}
@@ -1107,12 +1145,14 @@ export default function PosTerminal() {
                   ⚙️ Admin Dashboard
                 </button>
               )}
-              <button
-                onClick={() => { setShowUserMenu(false); setShowSessionCloseModal(true); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
-              >
-                🔒 Close Shift / Session
-              </button>
+              {user?.role !== 'customer' && (
+                <button
+                  onClick={() => { setShowUserMenu(false); setShowSessionCloseModal(true); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
+                >
+                  🔒 Close Shift / Session
+                </button>
+              )}
               <button
                 onClick={() => { setShowUserMenu(false); logout(); navigate('/login'); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
@@ -1308,25 +1348,29 @@ export default function PosTerminal() {
               <span className="truncate flex items-center gap-1.5 font-medium">
                 👤 Customer: <span className="font-semibold text-white">{cart.customerName}</span>
               </span>
-              <button
-                id="remove-customer-btn"
-                onClick={() => dispatch({ type: 'SET_CUSTOMER', customerId: null, name: '' })}
-                className="text-red-400 hover:text-red-300 font-bold px-1.5"
-              >
-                Clear
-              </button>
+              {user?.role !== 'customer' && (
+                <button
+                  id="remove-customer-btn"
+                  onClick={() => dispatch({ type: 'SET_CUSTOMER', customerId: null, name: '' })}
+                  className="text-red-400 hover:text-red-300 font-bold px-1.5"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           )}
 
           {/* ── Primary Action Buttons ───────────────────────────────────────── */}
           <div className="flex-shrink-0 px-5 py-3 border-t border-gray-800 flex gap-2">
-            <button
-              id="table-view-btn"
-              onClick={() => setShowTable(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold border border-gray-700 hover:border-gray-500 transition-all"
-            >
-              <Icons.Table /> Table
-            </button>
+            {user?.role !== 'customer' && (
+              <button
+                id="table-view-btn"
+                onClick={() => setShowTable(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold border border-gray-700 hover:border-gray-500 transition-all"
+              >
+                <Icons.Table /> Table
+              </button>
+            )}
             <button
               id="discount-btn"
               onClick={() => setShowDiscount(true)}
@@ -1468,7 +1512,7 @@ export default function PosTerminal() {
         />
       )}
 
-      {showSessionOpenModal && (
+      {showSessionOpenModal && user?.role !== 'customer' && (
         <SessionOpenModal
           user={user}
           onSuccess={(session) => {
@@ -1864,6 +1908,7 @@ function CustomersModal({ onSelect, onClose }) {
 }
 
 function OrdersModal({ onPay, onClose }) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -1914,7 +1959,7 @@ function OrdersModal({ onPay, onClose }) {
         <div className="w-full md:w-1/2 border-r border-gray-800 flex flex-col h-full overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-800 flex-shrink-0 flex items-center justify-between">
             <h2 className="text-white font-bold text-lg flex items-center gap-2">
-              📜 Active Shift Orders
+              {user?.role === 'customer' ? '📜 My Orders' : '📜 Active Shift Orders'}
             </h2>
             <button onClick={onClose} className="md:hidden w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
               <Icons.X />
@@ -1965,8 +2010,22 @@ function OrdersModal({ onPay, onClose }) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-white font-bold font-mono text-sm">{o.order_number || `Order #${o.id}`}</span>
-                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${o.status === 'draft' ? 'bg-gray-700 text-gray-300' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
-                      {o.status === 'draft' ? 'Draft' : 'KDS Pending'}
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                      o.status === 'draft'
+                        ? 'bg-gray-700 text-gray-300'
+                        : o.status === 'pending'
+                          ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                          : o.status === 'paid'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    }`}>
+                      {o.status === 'draft'
+                        ? 'Draft'
+                        : o.status === 'pending'
+                          ? 'KDS Pending'
+                          : o.status === 'paid'
+                            ? 'Paid'
+                            : 'Cancelled'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
@@ -2035,20 +2094,24 @@ function OrdersModal({ onPay, onClose }) {
               </div>
 
               {/* Action pane footer */}
-              <div className="p-6 border-t border-gray-800 bg-gray-900 flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => onPay(selectedOrder)}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-xs font-semibold"
-                >
-                  💳 Proceed to Pay
-                </button>
-                <button
-                  onClick={() => handleCancelOrder(selectedOrder.id)}
-                  className="px-5 py-3.5 bg-gray-800 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-500/25 font-semibold rounded-2xl transition-colors text-xs"
-                >
-                  Cancel Order
-                </button>
-              </div>
+              {selectedOrder.status !== 'paid' && selectedOrder.status !== 'cancelled' && (
+                <div className="p-6 border-t border-gray-800 bg-gray-900 flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => onPay(selectedOrder)}
+                    className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold rounded-2xl shadow-lg transition-transform active:scale-95 text-xs font-semibold"
+                  >
+                    💳 Proceed to Pay
+                  </button>
+                  {(user?.role !== 'customer' || selectedOrder.status === 'draft') && (
+                    <button
+                      onClick={() => handleCancelOrder(selectedOrder.id)}
+                      className="px-5 py-3.5 bg-gray-800 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-500/25 font-semibold rounded-2xl transition-colors text-xs"
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8 text-center">

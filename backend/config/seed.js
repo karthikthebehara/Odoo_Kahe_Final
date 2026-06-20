@@ -23,10 +23,6 @@ const initDB = async () => {
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
         
         // Split by ';' but be careful with formatted SQL. 
-        // For simplicity with mysql2, we can't run multiple statements in one query by default unless enabled,
-        // but it's better to split them or use a connection that allows it.
-        // The pool doesn't have multipleStatements: true by default.
-        // Let's execute the raw SQL individually.
         const statements = schemaSql
             .split(';')
             .map(s => s.trim())
@@ -40,6 +36,7 @@ const initDB = async () => {
         // 2. Seed Users
         const adminPassword = await bcrypt.hash('admin123', 10);
         const employeePassword = await bcrypt.hash('emp123', 10);
+        const customerPassword = await bcrypt.hash('cust123', 10);
 
         await pool.query(`
             INSERT INTO users (name, email, password, role)
@@ -52,6 +49,12 @@ const initDB = async () => {
             SELECT * FROM (SELECT 'Employee One' AS n, 'employee@odoocafe.com' AS e, ? AS p, 'employee' AS r) AS tmp
             WHERE NOT EXISTS (SELECT email FROM users WHERE email = 'employee@odoocafe.com') LIMIT 1;
         `, [employeePassword]);
+
+        await pool.query(`
+            INSERT INTO users (name, email, password, role)
+            SELECT * FROM (SELECT 'Demo Customer' AS n, 'customer@odoocafe.com' AS e, ? AS p, 'customer' AS r) AS tmp
+            WHERE NOT EXISTS (SELECT email FROM users WHERE email = 'customer@odoocafe.com') LIMIT 1;
+        `, [customerPassword]);
 
         // 3. Seed Categories
         const categories = [
@@ -117,8 +120,8 @@ const initDB = async () => {
         // 7. Seed Promotions (Three-tier engine demo data)
         // Fetch product IDs for product-level promos
         const [productRows] = await pool.query('SELECT id, name FROM products');
-        const productMap = {};
-        productRows.forEach(row => productMap[row.name] = row.id);
+        const productMap2 = {};
+        productRows.forEach(row => productMap2[row.name] = row.id);
 
         const promotions = [
             // ── Manual Coupon ──────────────────────────────────────────────
@@ -153,7 +156,7 @@ const initDB = async () => {
                 discount_type: 'percentage',
                 value: 15.00,
                 coupon_code: null,
-                product_id: productMap['Cappuccino'],
+                product_id: productMap2['Cappuccino'],
                 min_quantity: 3,
                 min_order_amount: null,
             },
@@ -164,7 +167,7 @@ const initDB = async () => {
                 discount_type: 'fixed_amount',
                 value: 2.00,
                 coupon_code: null,
-                product_id: productMap['Cheese Cake'],
+                product_id: productMap2['Cheese Cake'],
                 min_quantity: 2,
                 min_order_amount: null,
             },
@@ -216,7 +219,8 @@ const initDB = async () => {
         const customersSeed = [
             { name: 'Walk-in Customer', email: 'walkin@odoocafe.com', phone: '0000000000' },
             { name: 'John Doe', email: 'john@example.com', phone: '1234567890' },
-            { name: 'Jane Smith', email: 'jane@example.com', phone: '9876543210' }
+            { name: 'Jane Smith', email: 'jane@example.com', phone: '9876543210' },
+            { name: 'Demo Customer', email: 'customer@odoocafe.com', phone: '1234567890' }
         ];
         for (const cust of customersSeed) {
             await pool.query(`

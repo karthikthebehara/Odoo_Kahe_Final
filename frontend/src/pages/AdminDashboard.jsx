@@ -21,8 +21,7 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   Download,
-  Calendar,
-  Filter
+  Calendar
 } from 'lucide-react';
 
 const NAV = [
@@ -1701,7 +1700,7 @@ function ReportsPanel() {
   const [products, setProducts] = useState([]);
   
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(''); // kept for future error display
 
   const loadFilterData = useCallback(async () => {
     try {
@@ -1783,6 +1782,11 @@ function ReportsPanel() {
 
       {/* Main Content Scrollable Area */}
       <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-6 py-4 rounded-[1.5rem]">
+            {error}
+          </div>
+        )}
         {/* Filters and Export */}
         <div className="flex flex-wrap items-center justify-between gap-6 pb-2">
           <div className="flex flex-wrap items-center gap-3">
