@@ -75,6 +75,7 @@ const createOrder = async (req, res) => {
     session_id,
     table_id     = null,
     coupon_code  = null,
+    customer_id  = null,
     items,
   } = req.body;
 
@@ -304,17 +305,18 @@ const createOrder = async (req, res) => {
     const orderNumber = `ORD-${String(nextSeq).padStart(5, '0')}`;
 
     // ── STEP 7: INSERT order header ────────────────────────────────────────
-    //    Schema: orders(order_number, session_id, table_id, subtotal, discount_amount,
-    //            tax_amount, total_amount, status)
+    //    Schema: orders(order_number, session_id, table_id, customer_id, subtotal,
+    //            discount_amount, tax_amount, total_amount, status)
     const [orderResult] = await connection.execute(
       `INSERT INTO orders
-         (order_number, session_id, table_id, subtotal, discount_amount, tax_amount,
+         (order_number, session_id, table_id, customer_id, subtotal, discount_amount, tax_amount,
           total_amount, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())`,
       [
         orderNumber,
         session_id,
         table_id,
+        customer_id || null,
         cartGross,           // pre-discount line sum
         totalDiscount,       // all three tiers combined
         totalTax,
@@ -357,6 +359,7 @@ const createOrder = async (req, res) => {
           order_number:    orderNumber,
           session_id,
           table_id,
+          customer_id,
           status:          'draft',
           subtotal:        cartGross,
           discount_amount: totalDiscount,
@@ -609,9 +612,9 @@ const updateItemCompletion = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
     const [orders] = await pool.execute(
-      `SELECT id, order_number, session_id, table_id,
+      `SELECT id, order_number, session_id, table_id, customer_id,
               subtotal, discount_amount, tax_amount, total_amount,
-              status, kds_status, created_at
+              status, kds_status, payment_method, payment_ref, created_at
          FROM orders
         WHERE status IN ('draft', 'pending')
         ORDER BY created_at ASC`
@@ -669,9 +672,9 @@ const getOrderById = async (req, res) => {
 
   try {
     const [orderRows] = await pool.execute(
-      `SELECT id, order_number, session_id, table_id,
+      `SELECT id, order_number, session_id, table_id, customer_id,
               subtotal, discount_amount, tax_amount, total_amount,
-              status, kds_status, created_at
+              status, kds_status, payment_method, payment_ref, created_at
          FROM orders
         WHERE id = ?`,
       [orderId]
@@ -704,6 +707,7 @@ const getOrderById = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 // ─── getKdsSync ───────────────────────────────────────────────────────────────
 
 /**
@@ -811,6 +815,78 @@ const getCustomerSync = async (req, res) => {
   }
 };
 
+// ─── payOrder ───────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/orders/:id/pay
+ *
+ * Marks an order as paid, records the payment details, and releases the table.
+ */
+const payOrder = async (req, res) => {
+  const orderId = parseInt(req.params.id, 10);
+  if (isNaN(orderId)) {
+    return res.status(400).json({ success: false, error: 'Invalid order id.' });
+  }
+
+  const { payment_method, payment_ref = null, customer_id = null } = req.body;
+  if (!payment_method) {
+    return res.status(400).json({ success: false, error: 'payment_method is required.' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [orders] = await connection.execute(
+      'SELECT id, table_id, status FROM orders WHERE id = ?',
+      [orderId]
+    );
+
+    if (orders.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: `Order ${orderId} not found.` });
+    }
+
+    const order = orders[0];
+    if (order.status === 'paid') {
+      await connection.rollback();
+      return res.status(400).json({ success: false, error: 'Order is already paid.' });
+    }
+
+    await connection.execute(
+      `UPDATE orders 
+       SET status = 'paid', payment_method = ?, payment_ref = ?, customer_id = COALESCE(?, customer_id)
+       WHERE id = ?`,
+      [payment_method, payment_ref, customer_id, orderId]
+    );
+
+    if (order.table_id) {
+      await connection.execute(
+        `UPDATE tables SET status = 'available' WHERE id = ?`,
+        [order.table_id]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        order_id: orderId,
+        status: 'paid',
+        payment_method,
+        payment_ref,
+      }
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error('[payOrder] Error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  } finally {
+    connection.release();
+  }
+};
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -822,4 +898,6 @@ module.exports = {
   getOrderById,
   getKdsSync,
   getCustomerSync,
+  payOrder,
 };
+

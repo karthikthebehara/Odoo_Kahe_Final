@@ -21,7 +21,7 @@ DROP TABLE IF EXISTS categories;
 CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
-    color VARCHAR(7) DEFAULT '#3498db', -- Hex color code
+    color VARCHAR(7) DEFAULT '#3498db',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -66,20 +66,17 @@ CREATE TABLE tables (
 ) ENGINE=InnoDB;
 
 -- 6. Promotions Table (Three-tier promotion engine)
---    type = 'coupon'             → Manual coupon codes entered at checkout
---    type = 'automated_product'  → Auto-fires when item qty >= min_quantity
---    type = 'automated_order'    → Auto-fires when cart total >= min_order_amount
 DROP TABLE IF EXISTS promotions;
 CREATE TABLE promotions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     type ENUM('coupon', 'automated_product', 'automated_order') NOT NULL,
     discount_type ENUM('percentage', 'fixed_amount') NOT NULL,
-    value DECIMAL(10, 2) NOT NULL,                    -- Discount value (% or flat amount)
-    coupon_code VARCHAR(50) DEFAULT NULL UNIQUE,       -- Only for type = 'coupon'
-    product_id INT DEFAULT NULL,                       -- Only for type = 'automated_product'
-    min_quantity INT DEFAULT NULL,                     -- Qty threshold for product promos
-    min_order_amount DECIMAL(10, 2) DEFAULT NULL,      -- Cart-total threshold for order promos
+    value DECIMAL(10, 2) NOT NULL,
+    coupon_code VARCHAR(50) DEFAULT NULL UNIQUE,
+    product_id INT DEFAULT NULL,
+    min_quantity INT DEFAULT NULL,
+    min_order_amount DECIMAL(10, 2) DEFAULT NULL,
     start_date DATE,
     end_date DATE,
     is_active BOOLEAN DEFAULT TRUE,
@@ -95,30 +92,58 @@ CREATE TABLE sessions (
     start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     end_time TIMESTAMP NULL,
     status ENUM('open', 'closed') DEFAULT 'open',
+    opening_balance DECIMAL(10,2) DEFAULT 0.00,
+    closing_balance DECIMAL(10,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 8. Orders Table
+-- 8. Customers Table
+DROP TABLE IF EXISTS customers;
+CREATE TABLE customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) DEFAULT NULL,
+    phone VARCHAR(20) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 9. Payment Methods Table
+DROP TABLE IF EXISTS payment_methods;
+CREATE TABLE payment_methods (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    type ENUM('cash', 'card', 'upi') NOT NULL,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    upi_id VARCHAR(100) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 10. Orders Table
 DROP TABLE IF EXISTS orders;
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    order_number VARCHAR(20) NOT NULL UNIQUE,
+    order_number VARCHAR(20) DEFAULT NULL,
     session_id INT,
     table_id INT,
-    subtotal DECIMAL(10, 2) DEFAULT 0.00,          -- Cart total before discounts
-    discount_amount DECIMAL(10, 2) DEFAULT 0.00,    -- Total discount deducted
-    tax_amount DECIMAL(10, 2) DEFAULT 0.00,         -- Total tax applied
-    total_amount DECIMAL(10, 2) DEFAULT 0.00,       -- Final payable amount
+    customer_id INT DEFAULT NULL,
+    subtotal DECIMAL(10, 2) DEFAULT 0.00,
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00,
+    tax_amount DECIMAL(10, 2) DEFAULT 0.00,
+    total_amount DECIMAL(10, 2) DEFAULT 0.00,
     status ENUM('draft', 'pending', 'paid', 'cancelled') DEFAULT 'draft',
     kds_status ENUM('To Cook', 'Preparing', 'Completed') DEFAULT 'To Cook',
+    payment_method VARCHAR(50) DEFAULT NULL,
+    payment_ref VARCHAR(100) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-    FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE SET NULL
+    FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE SET NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 9. Order Items Table
+-- 11. Order Items Table
 DROP TABLE IF EXISTS order_items;
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -137,3 +162,4 @@ CREATE TABLE order_items (
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
