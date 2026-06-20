@@ -261,6 +261,7 @@ router.delete('/employees/:id', deleteEmployee);
 // ─── Session Management Routes ────────────────────────────────────────────────
 router.get('/sessions/active', verifyToken, getActiveSession);
 router.post('/sessions', verifyToken, openSession);
+router.get('/sessions', verifyToken, require('../controllers/sessionController').getAllSessions);
 router.put('/sessions/:id/close', verifyToken, closeSession);
 router.get('/sessions/:id/summary', verifyToken, getSessionSummary);
 
