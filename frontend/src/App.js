@@ -1,25 +1,75 @@
-import logo from './logo.svg';
-import './App.css';
+/**
+ * frontend/src/App.js
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Root of the Odoo Cafe POS React app.
+ *
+ * Route map:
+ *   /        → redirect → /login
+ *   /login   → Login page (public)
+ *   /pos     → POS Terminal (always accessible for demo — no auth guard)
+ *   /kds     → Kitchen Display Screen
+ *   /admin   → Admin Dashboard
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+import React, { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 
-function App() {
+// ── Code-split page imports ───────────────────────────────────────────────────
+const Login          = lazy(() => import('./pages/Login'));
+const PosTerminal    = lazy(() => import('./pages/PosTerminal'));
+const Kds            = lazy(() => import('./pages/Kds'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+
+// ── Full-page loading spinner ─────────────────────────────────────────────────
+function PageLoader() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{
+      minHeight: '100vh',
+      background: '#030712',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      gap: '16px',
+    }}>
+      <div style={{
+        width: 48, height: 48,
+        border: '3px solid rgba(245,158,11,0.2)',
+        borderTopColor: '#f59e0b',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+      <p style={{ color: '#6b7280', fontSize: 14 }}>Loading…</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-export default App;
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT APP — open routes (no auth guards) for easy hackathon demo
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Default → POS terminal directly for demo */}
+            <Route index element={<Navigate to="/pos" replace />} />
+
+            {/* All pages freely accessible */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/pos"   element={<PosTerminal />} />
+            <Route path="/kds"   element={<Kds />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/*" element={<AdminDashboard />} />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/pos" replace />} />
+          </Routes>
+        </Suspense>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}

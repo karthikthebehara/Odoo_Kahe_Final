@@ -204,48 +204,7 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
   );
 }
 
-// ── KDS column ────────────────────────────────────────────────────────────────
-function KdsColumn({ stage, orders }) {
-  return (
-    <div className="flex flex-col min-h-0 flex-1">
-      {/* Column header */}
-      <div className={`flex items-center gap-2.5 mb-4 px-1`}>
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-          style={{ backgroundColor: `${stage.color}25`, border: `1.5px solid ${stage.color}50` }}
-        >
-          {stage.icon}
-        </div>
-        <div>
-          <h3 className="text-white font-bold text-base leading-tight">{stage.label}</h3>
-          <p className="text-gray-500 text-xs">{orders.length} ticket{orders.length !== 1 ? 's' : ''}</p>
-        </div>
-        <div
-          className="ml-auto w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-          style={{ backgroundColor: stage.color }}
-        >
-          {orders.length}
-        </div>
-      </div>
 
-      {/* Ticket list */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-        {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-700">
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-2"
-              style={{ backgroundColor: `${stage.color}15` }}
-            >
-              {stage.icon}
-            </div>
-            <p className="text-sm font-medium text-gray-600">No orders here</p>
-          </div>
-        ) : null}
-        {/* Rendered by parent via passthrough */}
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN KDS COMPONENT
@@ -253,7 +212,6 @@ function KdsColumn({ stage, orders }) {
 export default function Kds() {
   const [orders,  setOrders]  = useState(INITIAL_MOCK);
   const [search,  setSearch]  = useState('');
-  const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState(new Date());
   const pollRef = useRef(null);
 
