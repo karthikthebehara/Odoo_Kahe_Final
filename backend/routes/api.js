@@ -33,6 +33,10 @@ const {
   getCustomerSync,
 } = require('../controllers/orderController');
 
+const {
+  getDashboardMetrics
+} = require('../controllers/reportController');
+
 // ─── Order Routes ─────────────────────────────────────────────────────────────
 
 /**
@@ -77,5 +81,13 @@ router.get('/sync/kds', getKdsSync);
  * Returns 200 + order payload when an active order exists, or 204 when idle.
  */
 router.get('/sync/customer-display/:tableId', getCustomerSync);
+
+// ─── Reporting Routes ─────────────────────────────────────────────────────────
+
+/**
+ * GET /api/reports/dashboard
+ * Multi-filter admin reporting dashboard metrics.
+ */
+router.get('/reports/dashboard', getDashboardMetrics);
 
 module.exports = router;
