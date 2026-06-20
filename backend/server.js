@@ -38,11 +38,10 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ─── Route Placeholders ──────────────────────────────────────────────────────
-// Routes will be mounted here as they are implemented:
-// app.use('/api/auth',        require('./routes/auth'));
-// app.use('/api/products',    require('./routes/products'));
-// app.use('/api/categories',  require('./routes/categories'));
+// ─── API Routes ──────────────────────────────────────────────────────────────
+app.use('/api', require('./routes/api'));
+
+// Route Placeholders (to be mounted as they are implemented):
 // app.use('/api/orders',      require('./routes/orders'));
 // app.use('/api/customers',   require('./routes/customers'));
 // app.use('/api/employees',   require('./routes/employees'));
