@@ -118,6 +118,25 @@ const deleteTable = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/tables/:id/free
+ * Cashier-facing endpoint to mark an occupied table as available again.
+ */
+const freeTable = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT id, status FROM tables WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Table not found.' });
+    }
+    await pool.query("UPDATE tables SET status = 'available' WHERE id = ?", [id]);
+    return res.status(200).json({ success: true, data: { id: parseInt(id, 10), status: 'available' } });
+  } catch (error) {
+    console.error('Free table error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to free table' });
+  }
+};
+
 const verifyTableToken = async (req, res) => {
   try {
     const { token } = req.params;
@@ -152,5 +171,6 @@ module.exports = {
   createTable,
   updateTable,
   deleteTable,
+  freeTable,
   verifyTableToken
 };

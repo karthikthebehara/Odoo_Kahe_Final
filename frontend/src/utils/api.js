@@ -101,11 +101,12 @@ export const ordersAPI = {
 export const tablesAPI = {
   list:   ()       => api.get('/api/tables'),
   floors: ()       => api.get('/api/floors'),
+  free:   (id)     => api.put(`/api/tables/${id}/free`),
 };
 
 export const kdsAPI = {
   list:         (params) => api.get('/api/sync/kds', { params }),
-  updateStatus: (orderId, status) => api.put(`/api/orders/${orderId}/kds`, { kds_status: status }),
+  updateStatus: (orderId, status) => api.put(`/api/orders/${orderId}/kds`, { status }),
   updateItem:   (orderId, itemId, is_item_completed)  => api.put(`/api/orders/${orderId}/items/${itemId}/complete`, { is_item_completed }),
 };
 

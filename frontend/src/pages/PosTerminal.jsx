@@ -392,7 +392,7 @@ function CartRow({ item, onQty, onRemove }) {
 }
 
 // ── Table / Floor Modal ───────────────────────────────────────────────────────
-function TableModal({ floors, onSelect, onClose }) {
+function TableModal({ floors, onSelect, onFreeTable, onClose }) {
   const [activeFloorId, setActiveFloorId] = useState(floors[0]?.id);
   const floor = floors.find(f => f.id === activeFloorId) || floors[0];
 
@@ -412,7 +412,7 @@ function TableModal({ floors, onSelect, onClose }) {
               <Icons.Table /> Select a Table
             </h2>
             <p className="text-gray-500 text-sm mt-0.5">
-              {floor ? floor.tables.filter(t => t.status === 'free').length : 0} tables available on {floor ? floor.name : ''}
+              {floor ? floor.tables.filter(t => t.status === 'available' || t.status === 'free').length : 0} tables available on {floor ? floor.name : ''}
             </p>
           </div>
           <button
@@ -446,34 +446,69 @@ function TableModal({ floors, onSelect, onClose }) {
         {/* Tables Grid */}
         <div className="p-6 grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto">
           {floor ? (floor.tables || []).map(t => {
-            const isActive = t.status === 'active';
+            const isOccupied = t.status === 'occupied';
+            const isReserved = t.status === 'reserved';
+            const isFree = !isOccupied && !isReserved;
+
             return (
-              <button
+              <div
                 key={t.id}
-                id={`table-btn-${t.id}`}
-                onClick={() => onSelect(t, floor)}
-                className={[
-                  'relative p-4 rounded-2xl border-2 text-center',
-                  'transition-all duration-150 hover:scale-105 active:scale-100',
-                  isActive
-                    ? 'border-amber-500 bg-amber-500/10 hover:border-amber-400'
-                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-500',
-                ].join(' ')}
+                className="relative group hover:scale-105 transition-all duration-150"
               >
-                {isActive && (
-                  <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                <button
+                  id={`table-btn-${t.id}`}
+                  onClick={() => onSelect(t, floor)}
+                  className={[
+                    'w-full p-4 pb-12 rounded-2xl border-2 text-center h-full flex flex-col items-center justify-between',
+                    isOccupied
+                      ? 'border-amber-500 bg-amber-500/10 hover:border-amber-400'
+                      : isReserved
+                        ? 'border-indigo-500 bg-indigo-500/10 hover:border-indigo-400'
+                        : 'border-gray-700 bg-gray-800/50 hover:border-gray-500',
+                  ].join(' ')}
+                >
+                  {isOccupied && (
+                    <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                  )}
+                  {isReserved && (
+                    <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                  )}
+                  <p className="text-white font-bold text-lg">{t.number}</p>
+                  <div className="flex items-center justify-center gap-1 mt-1 text-gray-400 text-xs">
+                    <Icons.Chair />{t.seats} seats
+                  </div>
+                  <span className={[
+                    'inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-full',
+                    isOccupied
+                      ? 'bg-amber-500/20 text-amber-400'
+                      : isReserved
+                        ? 'bg-indigo-500/20 text-indigo-400'
+                        : 'bg-gray-700 text-gray-500',
+                  ].join(' ')}>
+                    {isOccupied ? 'In Use' : isReserved ? 'Reserved' : 'Free'}
+                  </span>
+                </button>
+
+                {!isFree && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Are you sure you want to make Table ${t.number} free?`)) {
+                        try {
+                          await tablesAPI.free(t.id);
+                          onFreeTable?.();
+                        } catch (err) {
+                          alert('Failed to free table: ' + err.message);
+                        }
+                      }
+                    }}
+                    className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-red-650/80 hover:bg-red-600 text-white text-[9px] font-black rounded-lg transition-colors border border-red-500/30 shadow-lg shadow-red-950/20 animate-in fade-in duration-200"
+                  >
+                    Release
+                  </button>
                 )}
-                <p className="text-white font-bold text-lg">{t.number}</p>
-                <div className="flex items-center justify-center gap-1 mt-1 text-gray-400 text-xs">
-                  <Icons.Chair />{t.seats} seats
-                </div>
-                <span className={[
-                  'inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                  isActive ? 'bg-amber-500/20 text-amber-400' : 'bg-gray-700 text-gray-500',
-                ].join(' ')}>
-                  {isActive ? 'In Use' : 'Free'}
-                </span>
-              </button>
+              </div>
             );
           }) : (
             <div className="col-span-4 text-center py-8 text-gray-500">
@@ -857,7 +892,7 @@ export default function PosTerminal() {
             id: t.id,
             number: t.table_number,
             seats: t.seats,
-            status: t.status === 'available' ? 'free' : 'active'
+            status: t.status
           }));
         return {
           id: f.id,
@@ -1459,6 +1494,7 @@ export default function PosTerminal() {
         <TableModal
           floors={dbFloors}
           onSelect={handleTableSelect}
+          onFreeTable={fetchCatalogAndTables}
           onClose={() => setShowTable(false)}
         />
       )}

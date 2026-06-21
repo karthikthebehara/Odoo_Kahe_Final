@@ -2018,28 +2018,41 @@ function ReportsPanel() {
 
 // ── MOBILE ORDER PANEL ───────────────────────────────────────────────────────
 function MobileOrderPanel() {
-  const [enabled, setEnabled] = useState(() => {
-    return localStorage.getItem('odoo_mobile_self_ordering_enabled') === 'true';
-  });
-  const [mode, setMode] = useState(() => {
-    return localStorage.getItem('odoo_mobile_ordering_mode') || 'online';
-  });
-  const [bgColor, setBgColor] = useState(() => {
-    return localStorage.getItem('odoo_mobile_background_color') || '#0f172a';
-  });
-  const [uploadedImages, setUploadedImages] = useState(() => {
-    try {
-      const saved = localStorage.getItem('odoo_mobile_background_images');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const [enabled, setEnabled] = useState(false);
+  const [mode, setMode] = useState('online');
+  const [bgColor, setBgColor] = useState('#0f172a');
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [upiQrImage, setUpiQrImage] = useState(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [tables, setTables] = useState([]);
   const [selectedTableId, setSelectedTableId] = useState('');
   const [loadingTables, setLoadingTables] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  // Fetch configuration from backend API on mount
+  // Note: the api interceptor auto-unwraps the { success, data } envelope,
+  // so api.get() resolves with the `data` field directly.
+  useEffect(() => {
+    const fetchConfig = async () => {
+      setConfigLoading(true);
+      try {
+        const cfg = await api.get('/api/self-order/config');
+        setEnabled(!!cfg.enabled);
+        setMode(cfg.mode || 'online');
+        setBgColor(cfg.bgColor || '#0f172a');
+        setUploadedImages(Array.isArray(cfg.bgImages) ? cfg.bgImages : []);
+        setUpiQrImage(cfg.upiQrImage || null);
+      } catch (err) {
+        console.warn('[MobileOrderPanel] Failed to load config from API:', err);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   // Fetch tables from database
   useEffect(() => {
@@ -2084,20 +2097,40 @@ function MobileOrderPanel() {
     setUploadedImages(prev => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleSave = () => {
-    localStorage.setItem('odoo_mobile_self_ordering_enabled', String(enabled));
-    localStorage.setItem('odoo_mobile_ordering_mode', mode);
-    localStorage.setItem('odoo_mobile_background_color', bgColor);
-    localStorage.setItem('odoo_mobile_background_images', JSON.stringify(uploadedImages));
-    
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  const handleUpiQrUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setUpiQrImage(reader.result);
+    reader.readAsDataURL(file);
   };
 
-  // Generate dynamic preview URL token
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      await api.post('/api/self-order/config', {
+        enabled,
+        mode,
+        bgColor,
+        bgImages: uploadedImages,
+        upiQrImage: upiQrImage || '',
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error('[MobileOrderPanel] Failed to save config:', err);
+      setSaveError('Failed to save settings. Please try again.');
+      setTimeout(() => setSaveError(''), 4000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Generate dynamic preview URL token using window.location.origin
   const selectedTable = tables.find(t => String(t.id) === String(selectedTableId));
   const tableToken = selectedTable?.qr_token || 'asdfghhjkl';
-  const generatedUrl = `https://abcd.com/s/${tableToken}`;
+  const generatedUrl = `${window.location.origin}/s/${tableToken}`;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -2108,15 +2141,26 @@ function MobileOrderPanel() {
         </div>
         <button
           onClick={handleSave}
-          className="px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-black rounded-2xl shadow-lg transition-transform active:scale-95 text-xs flex items-center gap-2"
+          disabled={saving || configLoading}
+          className="px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-gray-950 font-black rounded-2xl shadow-lg transition-transform active:scale-95 text-xs flex items-center gap-2"
         >
-          💾 Save Configurations
+          {saving ? <><span className="w-3 h-3 border-2 border-gray-900/40 border-t-gray-900 rounded-full animate-spin" /> Saving…</> : '💾 Save Configurations'}
         </button>
       </div>
 
+      {configLoading && (
+        <div className="bg-gray-900/50 border border-gray-800 text-gray-500 text-xs rounded-2xl px-4 py-3 flex items-center gap-2">
+          <span className="w-3 h-3 border-2 border-gray-700 border-t-amber-500 rounded-full animate-spin" /> Loading configuration from server...
+        </div>
+      )}
       {saveSuccess && (
         <div className="bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs rounded-2xl px-4 py-3 animate-in fade-in duration-200">
           ✨ Settings saved successfully! Mobile order configuration has been updated.
+        </div>
+      )}
+      {saveError && (
+        <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-xs rounded-2xl px-4 py-3 animate-in fade-in duration-200">
+          ⚠️ {saveError}
         </div>
       )}
 
@@ -2165,20 +2209,47 @@ function MobileOrderPanel() {
                   <p className="text-slate-400 text-xs leading-relaxed font-medium">
                     Online ordering mode allows customers to select items, configure modifiers, and submit orders directly to the Kitchen KDS system.
                   </p>
-                  
-                  {/* Payment Method Mandatory read-only checkbox */}
-                  <div className="bg-gray-950/50 border border-gray-850 rounded-2xl p-4 flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="payment-method-counter"
-                      checked={true}
-                      disabled={true}
-                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-gray-800 border-gray-700 cursor-not-allowed"
-                    />
-                    <div>
-                      <label htmlFor="payment-method-counter" className="text-xs font-bold text-gray-300">Payment Method: Pay at counter</label>
-                      <p className="text-[10px] text-gray-500 mt-0.5">Mandatory checkout option for counter cashiers.</p>
+
+                  {/* UPI QR Payment Image Upload */}
+                  <div className="bg-gray-950/60 border border-gray-800 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-white text-xs font-extrabold">UPI Payment QR Code</p>
+                        <p className="text-gray-500 text-[10px] mt-0.5">Upload your merchant UPI QR image. Customers scan this to pay at their table.</p>
+                      </div>
+                      {upiQrImage && (
+                        <button
+                          type="button"
+                          onClick={() => setUpiQrImage(null)}
+                          className="text-red-400 hover:text-red-300 text-[10px] font-bold transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
+
+                    {upiQrImage ? (
+                      <div className="flex items-center gap-4">
+                        <div className="w-24 h-24 bg-white rounded-xl p-1.5 shadow-md border border-gray-700 flex-shrink-0">
+                          <img src={upiQrImage} alt="UPI QR" className="w-full h-full object-contain rounded-lg" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-emerald-400 text-xs font-bold">✅ QR Code uploaded</p>
+                          <p className="text-gray-500 text-[10px] mt-1">This QR will be shown to customers on the Payment & Review screen.</p>
+                          <label className="mt-2 inline-block cursor-pointer px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-[10px] font-bold rounded-lg border border-gray-700 transition-colors">
+                            Replace Image
+                            <input type="file" accept="image/*" onChange={handleUpiQrUpload} className="hidden" />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-700 hover:border-amber-500/50 rounded-2xl cursor-pointer transition-colors bg-gray-950/30 hover:bg-amber-500/5">
+                        <span className="text-2xl mb-1">📲</span>
+                        <span className="text-gray-400 text-xs font-bold">Upload UPI QR Image</span>
+                        <span className="text-gray-600 text-[10px] mt-0.5">PNG, JPG supported</span>
+                        <input type="file" accept="image/*" onChange={handleUpiQrUpload} className="hidden" />
+                      </label>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -2386,9 +2457,9 @@ function TableQRCodesPanel() {
     load();
   }, []);
 
-  // ── Derive QR URL from table token ──────────────────────────────────────────
+  // ── Derive QR URL from table token (use current origin dynamically) ─────────
   const qrUrl = (table) =>
-    `https://abcd.com/s/${table.qr_token || `table-${table.id}`}`;
+    `${window.location.origin}/s/${table.qr_token || `table-${table.id}`}`;
 
   // ── Render QR onto a <canvas> ref ───────────────────────────────────────────
   const QRCanvas = ({ table }) => {
@@ -2662,7 +2733,7 @@ function TableQRCodesPanel() {
         <div>
           <p className="text-white text-xs font-extrabold">QR URL Format</p>
           <p className="text-gray-500 text-[11px] mt-0.5 font-mono">
-            https://abcd.com/s/<span className="text-amber-400">[unique_table_token]</span>
+            {window.location.origin}/s/<span className="text-amber-400">[unique_table_token]</span>
           </p>
         </div>
         <div className="sm:ml-auto text-[11px] text-gray-600 leading-relaxed">

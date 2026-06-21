@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 
 // Elegant SVG Icons
 const Icons = {
@@ -22,12 +23,26 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 13.5H16.5V15H15V13.5zM16.5 15H18V16.5H16.5V15zM15 16.5H16.5V18H15V16.5zM18 13.5H19.5V15H18V13.5zM19.5 15H21V16.5H19.5V15zM18 16.5H19.5V18H18V16.5zM13.5 13.5H15V15H13.5V13.5zM13.5 15H15V16.5H13.5V15zM13.5 16.5H15V18H13.5V16.5z" />
     </svg>
+  ),
+  Card: () => (
+    <svg className="w-16 h-16 text-amber-500 mx-auto mb-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
+  Cash: () => (
+    <svg className="w-16 h-16 text-emerald-500 mx-auto mb-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
   )
 };
 
 export default function CustomerDisplay() {
   const [data, setData] = useState({
     state: 'CART', // 'CART' | 'PAYMENT' | 'THANK_YOU'
+    paymentMethod: 'cash',
+    upiId: '',
     cart: {
       items: [],
       subtotal: 0,
@@ -36,6 +51,24 @@ export default function CustomerDisplay() {
       total: 0,
     }
   });
+  const [upiQrUrl, setUpiQrUrl] = useState('');
+
+  // Generate real UPI QR Code when state is PAYMENT and paymentMethod is upi
+  useEffect(() => {
+    if (data.state === 'PAYMENT' && data.paymentMethod === 'upi') {
+      const upiLink = `upi://pay?pa=${encodeURIComponent(data.upiId || 'cafe@upi')}&pn=${encodeURIComponent('Odoo Cafe')}&am=${data.cart.total}&cu=INR`;
+      QRCode.toDataURL(upiLink, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      })
+      .then(url => setUpiQrUrl(url))
+      .catch(err => console.error('[CustomerDisplay] QR generation error:', err));
+    }
+  }, [data.state, data.paymentMethod, data.cart.total, data.upiId]);
 
   useEffect(() => {
     // 1. Initial load from localStorage
@@ -205,70 +238,85 @@ export default function CustomerDisplay() {
           </>
         )}
 
-        {/* State B: UPI QR Payment */}
+        {/* State B: Payment Request Screen */}
         {data.state === 'PAYMENT' && (
           <div className="flex-1 flex flex-col items-center justify-center text-center animate-in zoom-in-95 duration-300">
-            {/* Payment Header */}
-            <div className="mb-6">
-              <span className="bg-amber-500/10 text-amber-400 border border-amber-500/25 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
-                Payment Request
-              </span>
-              <h3 className="text-3xl font-black text-white mt-4 tracking-tight">Scan UPI to Pay</h3>
-              <p className="text-slate-500 text-sm mt-1 max-w-xs font-medium">Please scan the secure QR code using any UPI app (GPay, PhonePe, Paytm, BHIM)</p>
-            </div>
-
-            {/* UPI QR Container */}
-            <div className="relative bg-slate-900 border-2 border-amber-500/30 rounded-3xl p-8 shadow-2xl flex flex-col items-center justify-center max-w-sm w-full overflow-hidden">
-              {/* Scan Bar Glow Animation */}
-              <div className="absolute left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-orange-500 animate-scan pointer-events-none opacity-80" />
-              
-              {/* SVG QR Code */}
-              <div className="w-56 h-56 bg-white rounded-2xl p-4 flex items-center justify-center shadow-lg relative">
-                {/* Simulated high-quality QR vector representation */}
-                <svg className="w-full h-full text-slate-950" viewBox="0 0 100 100" fill="currentColor">
-                  {/* Outer markers */}
-                  <rect x="0" y="0" width="30" height="30" />
-                  <rect x="5" y="5" width="20" height="20" fill="white" />
-                  <rect x="10" y="10" width="10" height="10" />
-
-                  <rect x="70" y="0" width="30" height="30" />
-                  <rect x="75" y="5" width="20" height="20" fill="white" />
-                  <rect x="80" y="10" width="10" height="10" />
-
-                  <rect x="0" y="70" width="30" height="30" />
-                  <rect x="5" y="75" width="20" height="20" fill="white" />
-                  <rect x="10" y="80" width="10" height="10" />
-
-                  {/* Random QR code noise clusters for a highly authentic feel */}
-                  <rect x="40" y="5" width="5" height="15" />
-                  <rect x="50" y="10" width="10" height="5" />
-                  <rect x="45" y="20" width="15" height="10" />
-                  <rect x="5" y="40" width="15" height="5" />
-                  <rect x="0" y="50" width="10" height="15" />
-                  <rect x="15" y="60" width="15" height="5" />
-                  
-                  <rect x="40" y="40" width="20" height="20" />
-                  <rect x="45" y="45" width="10" height="10" fill="white" />
-                  <rect x="75" y="40" width="10" height="20" />
-                  <rect x="90" y="45" width="10" height="10" />
-                  <rect x="70" y="70" width="15" height="5" />
-                  <rect x="75" y="80" width="20" height="10" />
-                  <rect x="40" y="80" width="15" height="15" />
-                  <rect x="60" y="90" width="10" height="10" />
-                </svg>
-
-                {/* Tiny Coffee Icon in the middle of QR for a premium look */}
-                <div className="absolute inset-0 m-auto w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center text-lg shadow-md border-2 border-white">
-                  ☕
+            {data.paymentMethod === 'upi' ? (
+              <>
+                {/* Payment Header */}
+                <div className="mb-6">
+                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/25 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+                    Payment Request
+                  </span>
+                  <h3 className="text-3xl font-black text-white mt-4 tracking-tight">Scan UPI to Pay</h3>
+                  <p className="text-slate-500 text-sm mt-1 max-w-xs font-medium">Please scan the secure QR code using any UPI app (GPay, PhonePe, Paytm, BHIM)</p>
                 </div>
-              </div>
 
-              {/* Text overlay showing Grand Total */}
-              <div className="mt-6 text-center">
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Amount Due</p>
-                <p className="text-3xl font-black text-white tracking-tight mt-1">{fmt(data.cart.total)}</p>
-              </div>
-            </div>
+                {/* UPI QR Container */}
+                <div className="relative bg-slate-900 border-2 border-amber-500/30 rounded-3xl p-8 shadow-2xl flex flex-col items-center justify-center max-w-sm w-full overflow-hidden">
+                  {/* Scan Bar Glow Animation */}
+                  <div className="absolute left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-orange-500 animate-scan pointer-events-none opacity-80" />
+                  
+                  {/* Real QR Code */}
+                  <div className="w-56 h-56 bg-white rounded-2xl p-4 flex items-center justify-center shadow-lg relative">
+                    {upiQrUrl ? (
+                      <img src={upiQrUrl} alt="UPI QR Code" className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="w-6 h-6 border-2 border-slate-300 border-t-amber-500 rounded-full animate-spin" />
+                        <span className="text-slate-400 text-xs font-bold">Generating QR...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text overlay showing Grand Total */}
+                  <div className="mt-6 text-center">
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Amount Due</p>
+                    <p className="text-3xl font-black text-white tracking-tight mt-1">{fmt(data.cart.total)}</p>
+                  </div>
+                </div>
+              </>
+            ) : data.paymentMethod === 'card' ? (
+              <>
+                {/* Payment Header */}
+                <div className="mb-6">
+                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/25 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+                    Payment Request
+                  </span>
+                  <h3 className="text-3xl font-black text-white mt-4 tracking-tight">Swipe or Tap Card</h3>
+                  <p className="text-slate-500 text-sm mt-1 max-w-xs font-medium">Please insert, swipe, or tap your credit/debit card on the payment terminal</p>
+                </div>
+
+                {/* Card terminal view */}
+                <div className="relative bg-slate-900 border-2 border-amber-500/30 rounded-3xl p-12 shadow-2xl flex flex-col items-center justify-center max-w-sm w-full overflow-hidden">
+                  <Icons.Card />
+                  <div className="mt-6 text-center">
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Amount Due</p>
+                    <p className="text-3xl font-black text-white tracking-tight mt-1">{fmt(data.cart.total)}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Payment Header */}
+                <div className="mb-6">
+                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+                    Payment Request
+                  </span>
+                  <h3 className="text-3xl font-black text-white mt-4 tracking-tight">Pay Cash at Counter</h3>
+                  <p className="text-slate-500 text-sm mt-1 max-w-xs font-medium">Please hand the cash amount to the cashier at the register</p>
+                </div>
+
+                {/* Cash view */}
+                <div className="relative bg-slate-900 border-2 border-emerald-500/30 rounded-3xl p-12 shadow-2xl flex flex-col items-center justify-center max-w-sm w-full overflow-hidden">
+                  <Icons.Cash />
+                  <div className="mt-6 text-center">
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Amount Due</p>
+                    <p className="text-3xl font-black text-white tracking-tight mt-1">{fmt(data.cart.total)}</p>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Processing State */}
             <div className="mt-8 flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-2xl px-5 py-3">

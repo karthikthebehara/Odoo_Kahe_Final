@@ -23,6 +23,7 @@ const Kds            = lazy(() => import('./pages/Kds'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const CoffeeSearch   = lazy(() => import('./pages/CoffeeSearch'));
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'));
+const SelfOrder       = lazy(() => import('./pages/SelfOrder'));
 
 // ── Full-page loading spinner ─────────────────────────────────────────────────
 function PageLoader() {
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="/admin/*" element={<AdminDashboard />} />
             <Route path="/coffee" element={<CoffeeSearch />} />
             <Route path="/customer-display" element={<CustomerDisplay />} />
+            <Route path="/s/:token"  element={<SelfOrder />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/pos" replace />} />

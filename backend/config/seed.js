@@ -9,6 +9,24 @@ const path = require('path');
  */
 const initDB = async () => {
     try {
+        // Ensure settings table exists (required for self-ordering)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS settings (
+                \`key\` VARCHAR(100) PRIMARY KEY,
+                \`value\` LONGTEXT NOT NULL
+            ) ENGINE=InnoDB;
+        `);
+
+        // Seed settings if empty
+        const [settingsRows] = await pool.query("SELECT COUNT(*) AS count FROM settings");
+        if (settingsRows[0].count === 0) {
+            await pool.query("INSERT INTO settings (\`key\`, \`value\`) VALUES ('self_ordering_enabled', 'false')");
+            await pool.query("INSERT INTO settings (\`key\`, \`value\`) VALUES ('self_ordering_mode', 'online')");
+            await pool.query("INSERT INTO settings (\`key\`, \`value\`) VALUES ('self_ordering_bg_color', '#0f172a')");
+            await pool.query("INSERT INTO settings (\`key\`, \`value\`) VALUES ('self_ordering_bg_images', '[]')");
+            console.log('✅ Default settings seeded.');
+        }
+
         // Check if database is already initialized by checking for users table
         const [tables] = await pool.query("SHOW TABLES LIKE 'users'");
         if (tables.length > 0) {

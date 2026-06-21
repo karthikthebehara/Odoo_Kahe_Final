@@ -11,14 +11,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ordersAPI } from '../utils/api';
+import { kdsAPI } from '../utils/api';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types / constants
 // ═══════════════════════════════════════════════════════════════════════════════
 const STAGES = [
   {
-    key:   'draft',
+    key:   'To Cook',
     label: 'To Cook',
     icon:  '🔥',
     color: '#f59e0b',
@@ -27,7 +27,7 @@ const STAGES = [
     header: 'from-amber-600 to-amber-500',
   },
   {
-    key:   'pending',
+    key:   'Preparing',
     label: 'Preparing',
     icon:  '👨‍🍳',
     color: '#6366f1',
@@ -36,7 +36,7 @@ const STAGES = [
     header: 'from-indigo-600 to-indigo-500',
   },
   {
-    key:   'paid',
+    key:   'Completed',
     label: 'Completed',
     icon:  '✅',
     color: '#22c55e',
@@ -47,9 +47,9 @@ const STAGES = [
 ];
 
 const NEXT_STAGE = {
-  draft:   'pending',
-  pending: 'paid',
-  paid: null,
+  'To Cook':   'Preparing',
+  'Preparing': 'Completed',
+  'Completed': null,
 };
 
 // Mock data removed in favour of live API
@@ -111,9 +111,9 @@ function TicketItem({ item, onToggle }) {
 function TicketCard({ order, stage, onAdvance, onToggleItem }) {
   const age = useElapsed(order.created_at);
   const allDone = order.items.every(i => i.kds_status === 'completed');
-  const next = NEXT_STAGE[order.status];
+  const next = NEXT_STAGE[order.kds_status];
 
-  const isUrgent = stage.key === 'draft' &&
+  const isUrgent = stage.key === 'To Cook' &&
     (Date.now() - new Date(order.created_at)) > 10 * 60 * 1000;
 
   return (
@@ -194,7 +194,8 @@ export default function Kds() {
   // ── Load orders from API ────────────────────────────────────────────────
   const fetchOrders = useCallback(async () => {
     try {
-      const data = await ordersAPI.list().catch(() => null);
+      const res = await kdsAPI.list().catch(() => null);
+      const data = res?.data || res;
       if (data && Array.isArray(data)) {
         setOrders(data);
         setLastSync(new Date());
@@ -218,17 +219,17 @@ export default function Kds() {
         o.id === orderId
           ? {
               ...o,
-              status: nextStatus,
+              kds_status: nextStatus,
               items: o.items.map(i => ({
                 ...i,
-                kds_status: nextStatus === 'paid' ? 'completed' : i.kds_status,
+                kds_status: nextStatus === 'Completed' ? 'completed' : i.kds_status,
               })),
             }
           : o
       )
     );
     try {
-      await ordersAPI.updateStatus(orderId, nextStatus);
+      await kdsAPI.updateStatus(orderId, nextStatus);
     } catch { /* optimistic UI — revert on repeated failure if needed */ }
   }, []);
 
@@ -257,7 +258,7 @@ export default function Kds() {
   });
 
   const byStage = Object.fromEntries(
-    STAGES.map(s => [s.key, filtered.filter(o => o.status === s.key)])
+    STAGES.map(s => [s.key, filtered.filter(o => o.kds_status === s.key)])
   );
 
   // ── Elapsed sync label ──────────────────────────────────────────────────
