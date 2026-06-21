@@ -112,6 +112,10 @@ const createOrder = async (req, res) => {
   if (!resolvedSessionId) {
     return res.status(400).json({ success: false, error: 'session_id is required.' });
   }
+
+  const initialStatus = req.body.status || 'draft';
+  const paymentMethod = req.body.payment_method || null;
+  const paymentRef    = req.body.payment_ref || null;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, error: 'items array must contain at least one entry.' });
   }
@@ -335,12 +339,12 @@ const createOrder = async (req, res) => {
 
     // ── STEP 7: INSERT order header ────────────────────────────────────────
     //    Schema: orders(order_number, session_id, table_id, customer_id, subtotal,
-    //            discount_amount, tax_amount, total_amount, status)
+    //            discount_amount, tax_amount, total_amount, status, payment_method, payment_ref)
     const [orderResult] = await connection.execute(
       `INSERT INTO orders
          (order_number, session_id, table_id, customer_id, subtotal, discount_amount, tax_amount,
-          total_amount, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', NOW())`,
+          total_amount, status, payment_method, payment_ref, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         orderNumber,
         resolvedSessionId,
@@ -350,10 +354,20 @@ const createOrder = async (req, res) => {
         totalDiscount,       // all three tiers combined
         totalTax,
         finalTotal,
+        initialStatus,
+        paymentMethod,
+        paymentRef,
       ]
     );
 
     const orderId = orderResult.insertId;
+
+    if (table_id) {
+      await connection.execute(
+        `UPDATE tables SET status = 'occupied' WHERE id = ?`,
+        [table_id]
+      );
+    }
 
     // ── STEP 8: Batch-INSERT order_items ────────────────────────────────────
     //    Schema: order_items(order_id, product_id, quantity, price,
@@ -389,7 +403,9 @@ const createOrder = async (req, res) => {
           session_id:      resolvedSessionId,
           table_id,
           customer_id:     resolvedCustomerId,
-          status:          'draft',
+          status:          initialStatus,
+          payment_method:  paymentMethod,
+          payment_ref:     paymentRef,
           subtotal:        cartGross,
           discount_amount: totalDiscount,
           tax_amount:      totalTax,
@@ -765,6 +781,7 @@ const getKdsSync = async (req, res) => {
               created_at, updated_at
          FROM orders
         WHERE kds_status IN ('To Cook', 'Preparing')
+           OR (kds_status = 'Completed' AND DATE(created_at) = CURDATE())
         ORDER BY created_at ASC`
     );
 

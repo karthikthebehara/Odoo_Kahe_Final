@@ -73,6 +73,7 @@ const {
   createTable,
   updateTable,
   deleteTable,
+  freeTable,
   verifyTableToken,
 } = require('../controllers/tableController');
 
@@ -220,6 +221,7 @@ router.get('/tables', getAllTables);
 router.get('/tables/verify-token/:token', verifyTableToken);
 router.post('/tables', createTable);
 router.put('/tables/:id', updateTable);
+router.put('/tables/:id/free', verifyToken, freeTable);
 router.delete('/tables/:id', deleteTable);
 
 // ─── Payment Methods Routes ───────────────────────────────────────────────────
