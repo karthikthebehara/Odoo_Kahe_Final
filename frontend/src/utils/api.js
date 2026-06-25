@@ -91,6 +91,7 @@ export const ordersAPI = {
   list:         (params)       => api.get('/api/orders', { params }),
   get:          (id)           => api.get(`/api/orders/${id}`),
   create:       (data)         => api.post('/api/orders', data),
+  preview:      (data)         => api.post('/api/orders/preview', data),
   update:       (id, d)        => api.put(`/api/orders/${id}`, d),
   updateStatus: (id, status)   => api.put(`/api/orders/${id}/status`, { status }),
   sendToKds:    (id)           => api.post(`/api/orders/${id}/send-kitchen`),

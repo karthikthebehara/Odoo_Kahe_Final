@@ -344,7 +344,10 @@ function ProductsPanel() {
             {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>}
             
             <div className="space-y-4">
+              <label htmlFor="product-name" className="sr-only">Product Name</label>
               <input
+                id="product-name"
+                name="product_name"
                 type="text"
                 placeholder="Product Name"
                 value={name}
@@ -352,7 +355,10 @@ function ProductsPanel() {
                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
               />
               <div className="grid grid-cols-2 gap-3">
+                <label htmlFor="product-price" className="sr-only">Price</label>
                 <input
+                  id="product-price"
+                  name="price"
                   type="number"
                   step="0.01"
                   placeholder="Price (₹)"
@@ -360,7 +366,10 @@ function ProductsPanel() {
                   onChange={e => setPrice(e.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
                 />
+                <label htmlFor="product-category" className="sr-only">Category</label>
                 <select
+                  id="product-category"
+                  name="category_id"
                   value={categoryId}
                   onChange={e => setCategoryId(e.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
@@ -371,14 +380,20 @@ function ProductsPanel() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <label htmlFor="product-uom" className="sr-only">Unit of Measure</label>
                 <input
+                  id="product-uom"
+                  name="uom"
                   type="text"
                   placeholder="UoM (e.g. unit, slice, cup)"
                   value={uom}
                   onChange={e => setUom(e.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 transition-colors"
                 />
+                <label htmlFor="product-tax" className="sr-only">Tax Percentage</label>
                 <input
+                  id="product-tax"
+                  name="tax"
                   type="number"
                   step="0.01"
                   placeholder="Tax GST (%)"
@@ -388,7 +403,10 @@ function ProductsPanel() {
                 />
               </div>
 
+              <label htmlFor="product-desc" className="sr-only">Product Description</label>
               <textarea
+                id="product-desc"
+                name="description"
                 placeholder="Product Description"
                 value={desc}
                 onChange={e => setDesc(e.target.value)}
@@ -421,7 +439,10 @@ function ProductsPanel() {
 
       {/* Filter and search bar */}
       <div className="flex flex-col sm:flex-row gap-2.5">
+        <label htmlFor="prod-search" className="sr-only">Search products</label>
         <input
+          id="prod-search"
+          name="q"
           type="text"
           placeholder="Search products by name..."
           value={search}
@@ -2111,7 +2132,6 @@ function MobileOrderPanel() {
     try {
       await api.post('/api/self-order/config', {
         enabled,
-        mode,
         bgColor,
         bgImages: uploadedImages,
         upiQrImage: upiQrImage || '',
@@ -2183,35 +2203,35 @@ function MobileOrderPanel() {
 
       {/* Conditional Settings Configurations */}
       {enabled ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="grid grid-cols-1 gap-6 animate-in fade-in zoom-in-95 duration-200">
           
           {/* Left Column: Mode Switcher & URLs */}
           <div className="space-y-6">
             <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-lg space-y-5">
               <h3 className="text-white font-extrabold text-sm border-b border-gray-850 pb-3">Mode Settings</h3>
               
-              {/* Dropdown Selector */}
               <div className="space-y-2">
-                <label className="text-gray-400 text-xs font-semibold">Self-Ordering Mode</label>
-                <select
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3.5 text-xs focus:outline-none focus:border-amber-500 transition-colors"
-                >
-                  <option value="online">Online ordering</option>
-                  <option value="qr">QR Menu</option>
-                </select>
+                <p className="text-gray-400 text-xs font-semibold">When enabled, customers scanning the table QR will see two choices:</p>
+                <ul className="text-slate-400 text-xs list-disc list-inside mt-2">
+                  <li><strong>View Menu</strong> — view products and descriptions (no ordering)</li>
+                  <li><strong>Order Online</strong> — full self-order flow from selection to payment</li>
+                </ul>
               </div>
 
-              {/* Mode Specific Logic */}
-              {mode === 'online' ? (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <p className="text-slate-400 text-xs leading-relaxed font-medium">
-                    Online ordering mode allows customers to select items, configure modifiers, and submit orders directly to the Kitchen KDS system.
-                  </p>
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <p className="text-slate-400 text-xs leading-relaxed font-medium">
+                  Customers will choose the desired experience on their device; the admin only needs to toggle Self-Ordering ON or OFF.
+                </p>
 
-                  {/* UPI QR Payment Image Upload */}
-                  <div className="bg-gray-950/60 border border-gray-800 rounded-2xl p-4 space-y-3">
+                {/* If backend mode is QR-only, show a small warning to explain behavior */}
+                {mode === 'qr' && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-2xl px-4 py-3 leading-relaxed">
+                    ⚠️ <strong>Digital Menu Mode:</strong> Customers will only be able to view the menu (no ordering).
+                  </div>
+                )}
+
+                {/* UPI QR Payment Image Upload */}
+                <div className="bg-gray-950/60 border border-gray-800 rounded-2xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-white text-xs font-extrabold">UPI Payment QR Code</p>
@@ -2254,9 +2274,8 @@ function MobileOrderPanel() {
                 </div>
               ) : (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  {/* QR Menu Warning box */}
-                  <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-2xl px-4 py-3 leading-relaxed">
-                    ⚠️ <strong>Digital Menu Mode:</strong> It's only digital menu, not able to order. Customers can only view products and pricing details.
+                  <div className="bg-red-500/6 border border-red-500/12 text-red-400 text-xs rounded-2xl px-4 py-3 leading-relaxed">
+                    ⚠️ Self-Ordering is currently disabled. Toggle <strong>Self Ordering System</strong> ON to allow customers to place orders from table QR codes.
                   </div>
                 </div>
               )}
@@ -2337,82 +2356,7 @@ function MobileOrderPanel() {
             </div>
           </div>
 
-          {/* Right Column: Customization Controls */}
-          <div className="space-y-6">
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-lg space-y-5">
-              <h3 className="text-white font-extrabold text-sm border-b border-gray-850 pb-3">Visual Brand Customization</h3>
-              
-              {/* Color Picker */}
-              <div className="space-y-2">
-                <label className="text-gray-400 text-xs font-semibold">Self-Ordering Webpage Background Color</label>
-                <div className="flex gap-3">
-                  <input
-                    type="color"
-                    value={bgColor}
-                    onChange={(e) => setBgColor(e.target.value)}
-                    className="w-14 h-12 bg-gray-950 border border-gray-800 p-2 rounded-xl cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={bgColor}
-                    onChange={(e) => setBgColor(e.target.value)}
-                    placeholder="#0f172a"
-                    className="flex-1 bg-gray-950 border border-gray-800 text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 transition-colors font-mono uppercase"
-                  />
-                </div>
-              </div>
-
-              {/* Slider Image Upload Module */}
-              <div className="space-y-3 pt-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-gray-400 text-xs font-semibold">Background Slider Images (Max 3)</label>
-                  <span className="text-[10px] text-gray-500 font-bold">{uploadedImages.length}/3 Uploaded</span>
-                </div>
-
-                <div className="relative border-2 border-dashed border-gray-800 hover:border-gray-700 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-gray-950/40">
-                  <input
-                    type="file"
-                    multiple={true}
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploadedImages.length >= 3}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  <span className="text-2xl mb-1.5">🖼️</span>
-                  <span className="text-xs font-bold text-white">Click or drag images to upload</span>
-                  <span className="text-[10px] text-gray-500 mt-1">Image 1, Image 2, Image 3 sliders</span>
-                </div>
-
-                {/* Previews List */}
-                {uploadedImages.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3 pt-3 animate-in fade-in duration-200">
-                    {uploadedImages.map((img, idx) => (
-                      <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-800 h-20 bg-gray-950">
-                        <img
-                          src={img.dataUrl}
-                          alt={`Slider ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {/* Overlay overlay info */}
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(idx)}
-                            className="text-red-400 hover:text-red-300 font-extrabold text-[10px] bg-red-950/80 px-2 py-1 rounded-md border border-red-900/50"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        <div className="absolute bottom-0 left-0 bg-slate-950/85 px-1.5 py-0.5 text-[8px] font-bold text-gray-400 rounded-tr-md">
-                          Slider {idx + 1}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          {/* Right Column: Customization Controls removed per request */}
 
         </div>
       ) : (

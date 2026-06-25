@@ -24,6 +24,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const CoffeeSearch   = lazy(() => import('./pages/CoffeeSearch'));
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'));
 const SelfOrder       = lazy(() => import('./pages/SelfOrder'));
+const HomePage        = lazy(() => import('./pages/HomePage'));
 
 // ── Full-page loading spinner ─────────────────────────────────────────────────
 function PageLoader() {
@@ -59,8 +60,8 @@ export default function App() {
       <AuthProvider>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Default → POS terminal directly for demo */}
-            <Route index element={<Navigate to="/pos" replace />} />
+            {/* Default → Landing page */}
+            <Route index element={<HomePage />} />
 
             {/* All pages freely accessible */}
             <Route path="/login"  element={<Login />} />

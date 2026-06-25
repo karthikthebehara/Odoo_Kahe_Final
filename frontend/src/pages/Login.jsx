@@ -32,7 +32,6 @@ const EyeIcon = ({ show }) => (
 );
 
 const ROLES = [
-  { key: 'customer', label: 'Customer', hint: 'Online / Table Order' },
   { key: 'employee', label: 'Employee', hint: 'Cashier / POS Operator' },
   { key: 'admin',    label: 'Admin',    hint: 'Manager / Back-office'  },
 ];
@@ -65,137 +64,171 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 flex items-center justify-center p-4">
-      {/* Background decorative blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
-      </div>
+    <>
+      <style>{`
+        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .shimmer-text {
+          background: linear-gradient(90deg, #C2A688 0%, #FDFBF7 40%, #D07A56 70%, #C2A688 100%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer 4s linear infinite;
+        }
+      `}</style>
+      <div className="min-h-screen bg-cafe-espresso flex items-center justify-center p-4 relative font-sans overflow-hidden">
+        
+        {/* Video background */}
+        <video autoPlay loop muted playsInline poster="/cafe-hero.png"
+          className="absolute inset-0 w-full h-full object-cover z-0 opacity-30">
+          <source src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c054273b97f9040c0e6e8e05051930b1&profile_id=139&oauth2_token_id=57447761" type="video/mp4" />
+        </video>
 
-      <div className="relative w-full max-w-md">
-        {/* Card */}
-        <div className="bg-gray-900/80 backdrop-blur-xl border border-gray-700/60 rounded-3xl shadow-2xl p-8">
+        {/* Gradient overlays */}
+        <div className="absolute inset-0 bg-gradient-to-b from-cafe-espresso/60 via-transparent to-cafe-espresso z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-cafe-espresso/80 via-transparent to-cafe-espresso/80 z-10" />
+        
+        {/* Floating decorative circles */}
+        <div className="absolute top-32 left-16 w-64 h-64 bg-cafe-latte/5 rounded-full blur-3xl z-10" />
+        <div className="absolute bottom-32 right-16 w-80 h-80 bg-cafe-terracotta/5 rounded-full blur-3xl z-10" />
 
-          {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-              <CoffeeIcon />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Odoo Cafe POS</h1>
-            <p className="text-gray-400 text-sm mt-1">Sign in to start your session</p>
-          </div>
+        <div className="relative z-20 w-full max-w-md">
+          {/* Card */}
+          <div className="bg-[#120C07]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl p-8 lg:p-10">
 
-          {/* Role tabs */}
-          <div className="flex bg-gray-800/70 rounded-xl p-1 mb-6 gap-1">
-            {ROLES.map(r => (
-              <button
-                key={r.key}
-                onClick={() => setRole(r.key)}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
-                  ${role === r.key
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-gray-950 shadow-md'
-                    : 'text-gray-400 hover:text-white'}`}
-              >
-                <span className="block font-semibold">{r.label}</span>
-                <span className="block text-[10px] opacity-75">{r.hint}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">
-                Email Address
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder={role === 'admin' ? 'admin@odoocafe.com' : 'employee@odoocafe.com'}
-                className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-xl px-4 py-3
-                           placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1
-                           focus:ring-amber-500/50 transition-all duration-200 text-sm"
-              />
+            {/* Logo */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-cafe-latte to-cafe-terracotta rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(194,166,136,0.3)] mb-4 hover:scale-105 transition-transform duration-300">
+                <CoffeeIcon />
+              </div>
+              <h1 className="text-4xl font-black tracking-tight font-serif shimmer-text mb-1">Odoo Cafe</h1>
+              <p className="text-cafe-latte/80 text-xs font-bold uppercase tracking-widest mt-1">Portal Access</p>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="login-password"
-                  type={showPwd ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-xl px-4 py-3 pr-12
-                             placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1
-                             focus:ring-amber-500/50 transition-all duration-200 text-sm"
-                />
+            {/* Role tabs */}
+            <div className="flex bg-black/40 rounded-2xl p-1.5 mb-8 gap-1.5 border border-white/5 shadow-inner">
+              {ROLES.map(r => (
                 <button
+                  key={r.key}
                   type="button"
-                  onClick={() => setShowPwd(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-400
-                             transition-colors duration-150"
+                  onClick={() => setRole(r.key)}
+                  className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all duration-300
+                    ${role === r.key
+                      ? 'bg-gradient-to-r from-cafe-latte to-[#bfa180] text-cafe-espresso shadow-lg scale-[1.02]'
+                      : 'text-cafe-cream/50 hover:text-cafe-cream hover:bg-white/5'}`}
                 >
-                  <EyeIcon show={showPwd} />
+                  <span className="block">{r.label}</span>
+                  <span className={`block text-[9px] mt-0.5 ${role === r.key ? 'text-cafe-espresso/80 font-semibold' : 'opacity-60 font-medium'}`}>{r.hint}</span>
                 </button>
+              ))}
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email */}
+              <div>
+                <label className="block text-[10px] font-bold text-cafe-cream/60 mb-2 uppercase tracking-widest">
+                  Email Address
+                </label>
+                <div className="relative group">
+                  <input
+                    id="login-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder={role === 'admin' ? 'admin@odoocafe.com' : 'employee@odoocafe.com'}
+                    className="w-full bg-black/30 border border-white/10 text-cafe-cream rounded-2xl px-5 py-4
+                               placeholder-cafe-cream/20 focus:outline-none focus:border-cafe-latte focus:ring-1 focus:ring-cafe-latte/50
+                               transition-all duration-300 text-sm font-semibold group-hover:border-white/20"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-[10px] font-bold text-cafe-cream/60 mb-2 uppercase tracking-widest">
+                  Password
+                </label>
+                <div className="relative group">
+                  <input
+                    id="login-password"
+                    type={showPwd ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-black/30 border border-white/10 text-cafe-cream rounded-2xl px-5 py-4 pr-12
+                               placeholder-cafe-cream/20 focus:outline-none focus:border-cafe-latte focus:ring-1 focus:ring-cafe-latte/50
+                               transition-all duration-300 text-sm font-semibold group-hover:border-white/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(v => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-cafe-cream/40 hover:text-cafe-latte
+                               transition-colors duration-200 p-1"
+                  >
+                    <EyeIcon show={showPwd} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-5 py-3.5 text-sm text-red-400 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                  <span className="mt-0.5">⚠</span>
+                  <span className="font-medium">{error}</span>
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                id="login-submit"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-cafe-terracotta to-orange-500 hover:from-orange-500 hover:to-cafe-terracotta disabled:opacity-50 disabled:cursor-not-allowed text-white
+                           font-black py-4 rounded-2xl shadow-[0_8px_30px_rgba(208,122,86,0.3)] hover:shadow-[0_8px_40px_rgba(208,122,86,0.5)] transition-all
+                           duration-300 text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:-translate-y-0.5 mt-2"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Authenticating...
+                  </>
+                ) : (
+                  `Access ${role === 'admin' ? 'Dashboard' : 'Terminal'}`
+                )}
+              </button>
+            </form>
+
+            {/* Demo hint */}
+            <div className="mt-8 rounded-2xl bg-black/30 border border-white/5 p-5 text-xs text-cafe-cream/50">
+              <p className="font-black text-cafe-latte mb-3 uppercase tracking-widest text-[10px] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-cafe-latte rounded-full animate-pulse"></span>
+                Demo Credentials
+              </p>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center bg-white/5 rounded-xl px-3 py-2">
+                  <span className="font-semibold text-cafe-cream/70">Admin</span>
+                  <span className="text-cafe-latte font-mono font-bold">admin@odoocafe.com / admin123</span>
+                </div>
+                <div className="flex justify-between items-center bg-white/5 rounded-xl px-3 py-2">
+                  <span className="font-semibold text-cafe-cream/70">Cashier</span>
+                  <span className="text-cafe-latte font-mono font-bold">employee@odoocafe.com / emp123</span>
+                </div>
               </div>
             </div>
 
-            {/* Error message */}
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400 flex items-start gap-2">
-                <span className="mt-0.5">⚠</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Submit */}
-            <button
-              id="login-submit"
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400
-                         hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-950
-                         font-bold py-3.5 rounded-xl shadow-lg shadow-amber-500/25 transition-all
-                         duration-200 text-sm tracking-wide flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-gray-900/40 border-t-gray-900 rounded-full animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                `Sign in as ${role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : 'Customer'}`
-              )}
-            </button>
-          </form>
-
-          {/* Demo hint */}
-          <div className="mt-6 rounded-xl bg-gray-800/50 border border-gray-700/50 p-3 text-xs text-gray-400">
-            <p className="font-semibold text-gray-300 mb-1">Demo credentials</p>
-            <p>Admin:    <span className="text-amber-400 font-mono">admin@odoocafe.com / admin123</span></p>
-            <p>Cashier:  <span className="text-amber-400 font-mono">employee@odoocafe.com / emp123</span></p>
-            <p>Customer: <span className="text-amber-400 font-mono">customer@odoocafe.com / cust123</span></p>
+            {/* Signup link */}
+            <p className="text-center text-xs text-cafe-cream/40 mt-6 font-medium">
+              New staff member?{' '}
+              <Link to="/signup" className="text-cafe-latte hover:text-white font-bold transition-colors">
+                Create an account
+              </Link>
+            </p>
           </div>
-
-          {/* Signup link */}
-          <p className="text-center text-sm text-gray-500 mt-4">
-            New staff member?{' '}
-            <Link to="/signup" className="text-amber-400 hover:text-amber-300 font-semibold transition-colors">
-              Create an account
-            </Link>
-          </p>
         </div>
       </div>
-    </div>
+    </>
   );
 }

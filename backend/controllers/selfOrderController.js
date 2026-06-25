@@ -177,14 +177,11 @@ const selfOrderController = {
                 });
             }
 
-            const [modeRows] = await pool.query("SELECT value FROM settings WHERE `key` = 'self_ordering_mode'");
-            const mode = modeRows[0]?.value || 'online';
-            if (mode !== 'online') {
-                return res.status(400).json({
-                    success: false,
-                    error: "Self-Ordering checkout is disabled (Digital Menu Mode only)."
-                });
-            }
+            // NOTE: Allow public self-order checkout regardless of previously stored
+            // 'self_ordering_mode'. The admin will enable/disable self-ordering via
+            // `self_ordering_enabled`. The client UI presents both 'View Menu' and
+            // 'Order Online' options; backend should accept online checkout when
+            // `self_ordering_enabled` is true.
 
             // 2. Validate table token
             if (!token) {
@@ -209,6 +206,35 @@ const selfOrderController = {
             req.body.table_id = table.id;
             req.body.coupon_code = coupon_code || null;
             req.body.items = items;
+
+            // 3.a If guest provided contact details, find-or-create a customer
+            const customerName = (req.body.customer_name || '').trim();
+            const customerEmail = (req.body.customer_email || '').trim().toLowerCase();
+            const customerPhone = (req.body.customer_phone || '').trim();
+
+            if (customerEmail || customerPhone || customerName) {
+                // Try match by email first, then phone
+                let found = null;
+                if (customerEmail) {
+                    const [rows] = await pool.query('SELECT id FROM customers WHERE email = ? LIMIT 1', [customerEmail]);
+                    if (rows.length > 0) found = rows[0];
+                }
+                if (!found && customerPhone) {
+                    const [rows] = await pool.query('SELECT id FROM customers WHERE phone = ? LIMIT 1', [customerPhone]);
+                    if (rows.length > 0) found = rows[0];
+                }
+
+                if (found) {
+                    req.body.customer_id = found.id;
+                } else {
+                    // Insert new customer record
+                    const [insertRes] = await pool.query(
+                        'INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)',
+                        [customerName || null, customerEmail || null, customerPhone || null]
+                    );
+                    req.body.customer_id = insertRes.insertId;
+                }
+            }
             // Forward payment info so order is marked paid immediately
             req.body.payment_method = payment_method || 'cash';
             req.body.status = status || 'paid';
@@ -245,9 +271,11 @@ const selfOrderController = {
 
             // Get order header details
             const [orderRows] = await pool.query(
-                `SELECT o.id, o.order_number, o.status, o.kds_status, o.total_amount, t.table_number 
-                 FROM orders o 
-                 LEFT JOIN tables t ON o.table_id = t.id 
+                `SELECT o.id, o.order_number, o.status, o.kds_status, o.total_amount, t.table_number,
+                        c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone
+                 FROM orders o
+                 LEFT JOIN tables t ON o.table_id = t.id
+                 LEFT JOIN customers c ON o.customer_id = c.id
                  WHERE o.id = ?`,
                 [id]
             );
@@ -279,6 +307,9 @@ const selfOrderController = {
                     kds_status: order.kds_status,
                     total_amount: order.total_amount,
                     table_number: order.table_number,
+                        customer_name: order.customer_name || null,
+                        customer_email: order.customer_email || null,
+                        customer_phone: order.customer_phone || null,
                     items: itemRows
                 }
             });

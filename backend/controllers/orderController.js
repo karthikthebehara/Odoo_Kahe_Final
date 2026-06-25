@@ -461,7 +461,270 @@ const createOrder = async (req, res) => {
   }
 };
 
-// ─── updateOrderStatus ────────────────────────────────────────────────────────
+// ─── previewOrderDiscounts ──────────────────────────────────────────────────
+
+/**
+ * POST /api/orders/preview
+ * 
+ * Preview all automatic & manual discounts WITHOUT creating the order.
+ * Used by frontend to show real-time discount applications in the cart.
+ *
+ * Request body:
+ *   {
+ *     items: [{ product_id: number, quantity: number }]
+ *     coupon_code?: string
+ *   }
+ *
+ * Response: {
+ *   success: true,
+ *   data: {
+ *     subtotal: number,
+ *     product_discounts: [{ product_id, product_name, promo_name, discount }],
+ *     order_discount: { promo_name, discount }?,
+ *     coupon_discount: { coupon_code, promo_name, discount }?,
+ *     total_discount: number,
+ *     tax: number,
+ *     total: number
+ *   }
+ * }
+ */
+const previewOrderDiscounts = async (req, res) => {
+  const { items, coupon_code } = req.body;
+
+  // ── Input validation ────────────────────────────────────────────
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'items array must contain at least one entry.'
+    });
+  }
+
+  for (const [idx, item] of items.entries()) {
+    if (!item.product_id || !item.quantity || Number(item.quantity) < 1) {
+      return res.status(400).json({
+        success: false,
+        error: `Item at index ${idx} must have valid product_id and quantity >= 1.`
+      });
+    }
+  }
+
+  try {
+    // ── STEP 1: Resolve product prices ──────────────────────────
+    const productIds = items.map((i) => i.product_id);
+    const placeholders = productIds.map(() => '?').join(', ');
+
+    const [productRows] = await pool.execute(
+      `SELECT id, name, price, tax, is_available
+         FROM products
+        WHERE id IN (${placeholders})`,
+      productIds
+    );
+
+    const productMap = {};
+    for (const row of productRows) {
+      productMap[row.id] = row;
+    }
+
+    // Validate existence
+    for (const item of items) {
+      if (!productMap[item.product_id]) {
+        return res.status(404).json({
+          success: false,
+          error: `Product ${item.product_id} not found.`
+        });
+      }
+    }
+
+    // ── STEP 2: Calculate per-line grosses ──────────────────────
+    let cartGross = 0;
+    const lineItems = items.map((item) => {
+      const product = productMap[item.product_id];
+      const unitPrice = parseFloat(product.price);
+      const taxPct = parseFloat(product.tax);
+      const quantity = Number(item.quantity);
+      const lineGross = round2(unitPrice * quantity);
+      cartGross = round2(cartGross + lineGross);
+
+      return {
+        product_id: item.product_id,
+        product_name: product.name,
+        quantity,
+        unit_price: unitPrice,
+        tax_pct: taxPct,
+        line_gross: lineGross,
+        line_discount: 0,
+        line_subtotal: lineGross,
+      };
+    });
+
+    // ── STEP 3: TIER 2 – Automated Product Promotions ────────────
+    const [productPromos] = await pool.execute(
+      `SELECT id, name, product_id, min_quantity, discount_type, value
+         FROM promotions
+        WHERE type = 'automated_product'
+          AND is_active = 1
+          AND (start_date IS NULL OR start_date <= CURDATE())
+          AND (end_date IS NULL OR end_date >= CURDATE())
+          AND product_id IN (${placeholders})
+        ORDER BY value DESC`,
+      productIds
+    );
+
+    const productPromoMap = {};
+    for (const promo of productPromos) {
+      if (!productPromoMap[promo.product_id]) {
+        productPromoMap[promo.product_id] = promo;
+      }
+    }
+
+    let totalProductDiscount = 0;
+    let cartSubtotal = 0;
+    const appliedProductPromos = [];
+
+    for (const line of lineItems) {
+      const promo = productPromoMap[line.product_id];
+
+      if (promo && line.quantity >= promo.min_quantity) {
+        let disc = 0;
+        if (promo.discount_type === 'percentage') {
+          disc = round2(line.line_gross * (parseFloat(promo.value) / 100));
+        } else {
+          disc = Math.min(parseFloat(promo.value), line.line_gross);
+          disc = round2(disc);
+        }
+        line.line_discount = disc;
+        line.line_subtotal = round2(line.line_gross - disc);
+        
+        appliedProductPromos.push({
+          product_id: line.product_id,
+          product_name: line.product_name,
+          promo_name: promo.name,
+          discount: disc
+        });
+      }
+
+      totalProductDiscount = round2(totalProductDiscount + line.line_discount);
+      cartSubtotal = round2(cartSubtotal + line.line_subtotal);
+    }
+
+    // ── STEP 4: TIER 3 – Automated Order Promotion ──────────────
+    const [orderPromos] = await pool.execute(
+      `SELECT id, name, min_order_amount, discount_type, value
+         FROM promotions
+        WHERE type = 'automated_order'
+          AND is_active = 1
+          AND (start_date IS NULL OR start_date <= CURDATE())
+          AND (end_date IS NULL OR end_date >= CURDATE())
+          AND (min_order_amount IS NULL OR min_order_amount <= ?)
+        ORDER BY value DESC
+        LIMIT 1`,
+      [cartSubtotal]
+    );
+
+    let autoOrderDiscount = 0;
+    let appliedAutoOrderPromo = null;
+
+    if (orderPromos.length > 0) {
+      const promo = orderPromos[0];
+      const dv = parseFloat(promo.value);
+
+      if (promo.discount_type === 'percentage') {
+        autoOrderDiscount = round2(cartSubtotal * (dv / 100));
+      } else {
+        autoOrderDiscount = round2(Math.min(dv, cartSubtotal));
+      }
+
+      appliedAutoOrderPromo = {
+        promo_name: promo.name,
+        min_order_amount: promo.min_order_amount,
+        discount_type: promo.discount_type,
+        discount_value: promo.value,
+        discount: autoOrderDiscount
+      };
+    }
+
+    let runningSubtotal = round2(cartSubtotal - autoOrderDiscount);
+
+    // ── STEP 5: TIER 1 – Manual Coupon ─────────────────────────
+    let couponDiscount = 0;
+    let appliedCoupon = null;
+
+    if (coupon_code) {
+      const [couponRows] = await pool.execute(
+        `SELECT id, name, discount_type, value
+           FROM promotions
+          WHERE type = 'coupon'
+            AND is_active = 1
+            AND coupon_code = ?
+            AND (start_date IS NULL OR start_date <= CURDATE())
+            AND (end_date IS NULL OR end_date >= CURDATE())
+          LIMIT 1`,
+        [coupon_code.trim().toUpperCase()]
+      );
+
+      if (couponRows.length > 0) {
+        const promo = couponRows[0];
+        const cv = parseFloat(promo.value);
+
+        if (promo.discount_type === 'percentage') {
+          couponDiscount = round2(runningSubtotal * (cv / 100));
+        } else {
+          couponDiscount = round2(Math.min(cv, runningSubtotal));
+        }
+
+        appliedCoupon = {
+          coupon_code: coupon_code.trim().toUpperCase(),
+          promo_name: promo.name,
+          discount_type: promo.discount_type,
+          discount_value: promo.value,
+          discount: couponDiscount
+        };
+      }
+      // Note: If coupon is invalid, we still show the preview (just without coupon)
+    }
+
+    // ── STEP 6: Calculate totals ────────────────────────────────
+    const totalDiscount = round2(totalProductDiscount + autoOrderDiscount + couponDiscount);
+    const discountedSubtotal = round2(cartGross - totalDiscount);
+
+    // Tax calculation
+    let totalTax = 0;
+    for (const line of lineItems) {
+      const lineShareRatio = cartSubtotal > 0
+        ? (line.line_subtotal / cartSubtotal)
+        : 0;
+      const lineOrderDisc = round2((autoOrderDiscount + couponDiscount) * lineShareRatio);
+      const lineTaxableBase = round2(line.line_subtotal - lineOrderDisc);
+      const lineTax = round2(Math.max(0, lineTaxableBase) * (line.tax_pct / 100));
+      totalTax = round2(totalTax + lineTax);
+    }
+
+    const finalTotal = round2(discountedSubtotal + totalTax);
+
+    // ── Return preview ──────────────────────────────────────────
+    return res.json({
+      success: true,
+      data: {
+        subtotal: cartGross,
+        product_discounts: appliedProductPromos,
+        order_discount: appliedAutoOrderPromo,
+        coupon_discount: appliedCoupon,
+        total_discount: totalDiscount,
+        tax: totalTax,
+        total: finalTotal
+      }
+    });
+
+  } catch (err) {
+    console.error('[previewOrderDiscounts] Error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to calculate order preview.'
+    });
+  }
+};
+
+// ─── updateOrderStatus ──────────────────────────────────────────────────────
 
 const ORDER_STATES = ['draft', 'pending', 'paid'];
 
@@ -951,6 +1214,7 @@ const payOrder = async (req, res) => {
 
 module.exports = {
   createOrder,
+  previewOrderDiscounts,
   updateOrderStatus,
   updateKdsStatus,
   updateItemCompletion,

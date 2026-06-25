@@ -82,25 +82,25 @@ function TicketItem({ item, onToggle }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onToggle(item.id); }}
-      className={`w-full text-left flex items-center gap-2.5 py-1.5 px-2 rounded-lg
+      className={`w-full text-left flex items-center gap-2.5 py-2 px-3 rounded-xl
                   transition-all duration-150 group
-        ${done ? 'opacity-40' : 'hover:bg-white/5'}`}
+        ${done ? 'opacity-40' : 'hover:bg-[#C2A688]/5'}`}
     >
-      <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center
+      <div className={`w-4 h-4 rounded-md border flex-shrink-0 flex items-center justify-center
                        transition-all duration-150
         ${done
-          ? 'bg-emerald-500 border-emerald-500'
-          : 'border-gray-600 group-hover:border-gray-400'}`}>
+          ? 'bg-[#4B6043] border-[#4B6043]'
+          : 'border-[#C2A688]/30 group-hover:border-[#C2A688]/60'}`}>
         {done && (
           <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
             <polyline points="1.5,5 4,7.5 8.5,2" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
         )}
       </div>
-      <span className={`text-sm flex-1 transition-all ${done ? 'line-through text-gray-600' : 'text-gray-200'}`}>
+      <span className={`text-sm flex-1 transition-all font-medium ${done ? 'line-through text-[#C2A688]/30' : 'text-white'}`}>
         {item.product_name}
       </span>
-      <span className={`text-xs font-bold flex-shrink-0 ${done ? 'text-gray-600' : 'text-white'}`}>
+      <span className={`text-xs font-bold flex-shrink-0 ${done ? 'text-[#C2A688]/30' : 'text-[#C2A688]'}`}>
         ×{item.quantity}
       </span>
     </button>
@@ -119,39 +119,45 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
   return (
     <div
       onClick={() => next && onAdvance(order.id, next)}
-      className={`bg-gray-800/80 border rounded-2xl overflow-hidden shadow-md
-                  transition-all duration-200 cursor-pointer select-none
-                  hover:shadow-xl hover:scale-[1.01] ring-1
-                  ${isUrgent ? 'border-red-500/50 ring-red-500/20 animate-pulse-slow' : `border-gray-700/60 ${stage.ring}`}
-                  ${next ? 'active:scale-[0.99]' : 'cursor-default'}`}
+      className={`bg-gradient-to-br from-[#ffffff]/4 to-[#ffffff]/1 border rounded-2xl overflow-hidden shadow-lg
+                  transition-all duration-200 backdrop-blur-sm select-none
+                  ${next ? 'cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]' : 'cursor-default'}
+                  ${isUrgent 
+                    ? 'border-[#D07A56]/50 ring-1 ring-[#D07A56]/20 animate-pulse-slow' 
+                    : `border-[#C2A688]/20 ring-1 ${stage.ring}`}`}
     >
       {/* Header */}
-      <div className={`p-3 bg-gradient-to-r ${stage.header} text-white flex items-center justify-between`}>
-        <div className="flex items-center gap-2">
-          <div className="bg-white/20 rounded px-2 py-0.5 text-sm font-bold shadow-sm">
+      <div 
+        className={`p-4 text-white font-black text-sm flex items-center justify-between`}
+        style={{
+          background: `linear-gradient(135deg, ${stage.color}30 0%, ${stage.color}15 100%)`,
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="bg-white/20 rounded-lg px-3 py-1.5 text-base font-black shadow-md">
             #{order.id}
           </div>
           {order.table_label && (
-            <span className="text-white/70 text-xs bg-white/10 px-1.5 py-0.5 rounded-md">
-              {order.table_label}
+            <span className="text-white/70 text-xs bg-white/10 px-2.5 py-1 rounded-lg backdrop-blur-sm border border-white/10">
+              🪑 {order.table_label}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-mono font-bold ${isUrgent ? 'text-red-200' : 'text-white/70'}`}>
+          <span className={`text-xs font-mono font-bold tracking-wider ${isUrgent ? 'text-[#D07A56]' : 'text-white/60'}`}>
             {age}
           </span>
           {next && (
-            <div className="text-white/60 text-xs border border-white/20 px-1.5 py-0.5 rounded-lg
-                            hover:border-white/50 transition-colors">
+            <div className="text-white/60 text-xs border border-white/20 px-2 py-1 rounded-lg
+                            hover:border-white/50 hover:text-white/80 transition-colors font-semibold">
               → {STAGES.find(s => s.key === next)?.label}
             </div>
           )}
         </div>
       </div>
 
-      {/* Items */}
-      <div className="p-3 space-y-0.5" onClick={e => e.stopPropagation()}>
+      {/* Items list */}
+      <div className="px-4 py-3 space-y-1 border-b border-[#C2A688]/10" onClick={e => e.stopPropagation()}>
         {order.items.map(item => (
           <TicketItem
             key={item.id}
@@ -162,18 +168,18 @@ function TicketCard({ order, stage, onAdvance, onToggleItem }) {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-gray-700/50 flex items-center justify-between">
-        <span className="text-gray-500 text-xs">{order.items.length} items</span>
+      <div className="px-4 py-3 flex items-center justify-between text-xs">
+        <span className="text-[#C2A688]/50 font-semibold">{order.items.length} items</span>
         {allDone && next && (
-          <span className="text-emerald-400 text-xs font-semibold flex items-center gap-1">
+          <span className="text-[#4B6043] font-bold flex items-center gap-1.5 bg-[#4B6043]/10 px-2.5 py-1 rounded-lg border border-[#4B6043]/20">
             <svg className="w-3 h-3" viewBox="0 0 10 10" fill="none">
               <polyline points="1.5,5 4,7.5 8.5,2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            All done — tap to advance
+            Ready to advance
           </span>
         )}
         {!next && (
-          <span className="text-emerald-400 text-xs font-semibold">✓ Served</span>
+          <span className="text-[#4B6043] font-bold flex items-center gap-1.5 bg-[#4B6043]/10 px-2.5 py-1 rounded-lg border border-[#4B6043]/20">✓ Served</span>
         )}
       </div>
     </div>
@@ -230,7 +236,9 @@ export default function Kds() {
     );
     try {
       await kdsAPI.updateStatus(orderId, nextStatus);
-    } catch { /* optimistic UI — revert on repeated failure if needed */ }
+    } catch (err) {
+      console.error('[KDS] Failed to advance order status:', err);
+    }
   }, []);
 
   // ── Toggle individual item ──────────────────────────────────────────────
@@ -266,126 +274,129 @@ export default function Kds() {
 
   // ═════════════════════════════════════════════════════════════════════════
   return (
-    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
-
+    <div className="h-screen bg-gradient-to-br from-[#0f0e0c] via-[#1a1512] to-[#0f0e0c] flex flex-col overflow-hidden">
+      
       {/* ── KDS Header ─────────────────────────────────────────────────── */}
-      <header className="bg-gray-900/95 border-b border-gray-800 px-6 py-3 flex items-center gap-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center text-lg">
+      <header className="flex-shrink-0 bg-gradient-to-r from-[#1a110b]/95 to-[#2a1f18]/95 backdrop-blur-lg border-b border-[#C2A688]/10 px-8 py-4 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#D07A56] to-[#C2A688] rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-[#D07A56]/30">
             🍳
           </div>
           <div>
-            <h1 className="text-white font-bold text-base leading-tight">Kitchen Display</h1>
-            <p className="text-gray-500 text-xs">Last sync: {syncLabel} ago</p>
+            <h1 className="text-white font-black text-lg leading-tight tracking-tight">Kitchen Display System</h1>
+            <p className="text-[#C2A688]/60 text-xs font-semibold uppercase tracking-wider">Last sync: {syncLabel} ago</p>
           </div>
         </div>
 
-        {/* Summary badges */}
-        <div className="flex items-center gap-2 ml-4">
+        {/* Status badges */}
+        <div className="flex items-center gap-3 ml-6">
           {STAGES.map(s => (
             <div
               key={s.key}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide backdrop-blur-sm border transition-all"
               style={{
-                backgroundColor: `${s.color}18`,
-                border: `1px solid ${s.color}35`,
+                backgroundColor: `${s.color}12`,
+                borderColor: `${s.color}35`,
                 color: s.color,
               }}
             >
-              <span>{s.icon}</span>
-              <span>{byStage[s.key]?.length || 0}</span>
+              <span className="text-lg">{s.icon}</span>
+              <span className="font-black">{byStage[s.key]?.length || 0}</span>
+              <span className="hidden sm:inline">{s.label}</span>
             </div>
           ))}
         </div>
 
-        {/* Search */}
-        <div className="ml-auto relative w-64">
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search order / product…"
-            className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-xl
-                       px-4 py-2 pl-9 focus:outline-none focus:border-amber-500 transition-colors"
-          />
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+        {/* Search & Refresh */}
+        <div className="flex items-center gap-2 ml-auto">
+          <div className="relative hidden md:block w-56">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search order / product…"
+              className="w-full bg-[#ffffff]/5 border border-[#C2A688]/20 text-white text-sm rounded-xl
+                         px-4 py-2.5 pl-10 placeholder-[#C2A688]/40 focus:outline-none focus:border-[#C2A688]/50 focus:ring-1 focus:ring-[#C2A688]/30 transition-all duration-200"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C2A688]/40">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
           </div>
-        </div>
 
-        {/* Refresh */}
-        <button
-          onClick={fetchOrders}
-          className="w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700
-                     flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-          </svg>
-        </button>
+          <button
+            onClick={fetchOrders}
+            className="w-10 h-10 rounded-lg bg-[#C2A688]/10 hover:bg-[#C2A688]/20 border border-[#C2A688]/20 hover:border-[#C2A688]/40
+                       flex items-center justify-center text-[#C2A688] hover:text-[#D07A56] transition-all duration-200 font-bold"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            </svg>
+          </button>
+        </div>
       </header>
 
-      {/* ── 3-column board ─────────────────────────────────────────────── */}
-      <div className="flex-1 grid grid-cols-3 gap-0 overflow-hidden">
-        {STAGES.map((stage, colIdx) => (
+      {/* ── 3-column Kanban board ─────────────────────────────────────── */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-6 min-h-0 overflow-hidden">
+        {STAGES.map((stage) => (
           <div
             key={stage.key}
-            className={`flex flex-col overflow-hidden p-5
-              ${colIdx < STAGES.length - 1 ? 'border-r border-gray-800/60' : ''}`}
+            className="flex flex-col bg-gradient-to-b from-[#ffffff]/3 to-[#ffffff]/1 border border-[#C2A688]/10 rounded-2xl overflow-hidden backdrop-blur-sm shadow-xl min-h-0"
           >
-            {/* Column header strip */}
+            {/* Column header */}
             <div
-              className="flex items-center gap-2.5 mb-4 pb-3 border-b flex-shrink-0"
-              style={{ borderColor: `${stage.color}30` }}
+              className="flex-shrink-0 px-6 py-5 border-b border-[#C2A688]/10"
+              style={{
+                background: `linear-gradient(135deg, ${stage.color}15 0%, ${stage.color}08 100%)`,
+              }}
             >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
-                style={{ backgroundColor: `${stage.color}20` }}
-              >
-                {stage.icon}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white font-bold text-base">{stage.label}</h3>
-                <p className="text-gray-500 text-xs">{byStage[stage.key]?.length} tickets</p>
-              </div>
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white"
-                style={{ backgroundColor: stage.color }}
-              >
-                {byStage[stage.key]?.length || 0}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shadow-md"
+                    style={{ backgroundColor: `${stage.color}20` }}
+                  >
+                    {stage.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-base tracking-tight">{stage.label}</h3>
+                    <p className="text-[#C2A688]/50 text-xs font-semibold">{byStage[stage.key]?.length || 0} tickets</p>
+                  </div>
+                </div>
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg"
+                  style={{ backgroundColor: stage.color }}
+                >
+                  {byStage[stage.key]?.length || 0}
+                </div>
               </div>
             </div>
 
-            {/* Scrollable ticket list */}
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {byStage[stage.key]?.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-700">
+            {/* Scrollable tickets area */}
+            <div className="flex-1 overflow-y-auto space-y-3 p-4">
+              {byStage[stage.key]?.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl mb-3"
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-4 shadow-md"
                     style={{ backgroundColor: `${stage.color}12` }}
                   >
                     {stage.icon}
                   </div>
-                  <p className="text-sm font-medium text-gray-600">No orders</p>
-                  <p className="text-xs text-gray-700 mt-1">
-                    {stage.key === 'to_cook' ? 'Waiting for new orders…'
-                      : stage.key === 'preparing' ? 'Nothing in progress'
-                      : 'No completed orders yet'}
-                  </p>
+                  <p className="text-[#C2A688]/40 text-sm font-semibold">No orders in {stage.label}</p>
+                  <p className="text-[#C2A688]/20 text-xs mt-1">Waiting for new tickets…</p>
                 </div>
+              ) : (
+                byStage[stage.key]?.map(order => (
+                  <TicketCard
+                    key={order.id}
+                    order={order}
+                    stage={stage}
+                    onAdvance={handleAdvance}
+                    onToggleItem={handleToggleItem}
+                  />
+                ))
               )}
-
-              {byStage[stage.key]?.map(order => (
-                <TicketCard
-                  key={order.id}
-                  order={order}
-                  stage={stage}
-                  onAdvance={handleAdvance}
-                  onToggleItem={handleToggleItem}
-                />
-              ))}
             </div>
           </div>
         ))}

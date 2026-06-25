@@ -687,6 +687,10 @@ export default function PosTerminal() {
   // ── Unified product-image map: title/keyword (lowercase) → imageUrl ─────────
   const [productImages, setProductImages] = useState({});
 
+  // ── Order preview for real-time discount display ─────────────────────────────
+  const [orderPreview, setOrderPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   useEffect(() => {
     /**
      * TIER-1  : sampleapis.com — hot coffee items  (title → image)
@@ -848,6 +852,38 @@ export default function PosTerminal() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productImages]);
 
+  // ── Fetch order preview for real-time discount visibility ────────────────────
+  useEffect(() => {
+    if (cart.items.length === 0) {
+      setOrderPreview(null);
+      return;
+    }
+
+    const fetchPreview = async () => {
+      setPreviewLoading(true);
+      try {
+        const payload = {
+          items: cart.items.map(item => ({
+            product_id: item.id,
+            quantity: item.qty
+          })),
+          ...(cart.coupon && { coupon_code: cart.coupon.code })
+        };
+        const result = await ordersAPI.preview(payload);
+        setOrderPreview(result);
+      } catch (err) {
+        console.error('Failed to fetch order preview:', err);
+        setOrderPreview(null);
+      } finally {
+        setPreviewLoading(false);
+      }
+    };
+
+    // Debounce preview fetches to avoid too many API calls
+    const timer = setTimeout(fetchPreview, 300);
+    return () => clearTimeout(timer);
+  }, [cart.items, cart.coupon]);
+
   // ── Redirect if not logged in ──
   useEffect(() => {
     if (!user) {
@@ -983,7 +1019,7 @@ export default function PosTerminal() {
         session_id: activeSession?.id || 1,
         table_id: cart.tableId,
         customer_id: cart.customerId || null,
-        coupon_code: cart.coupon?.coupon_code || null,
+        coupon_code: cart.coupon?.code || null,
         items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty }))
       });
       setSendState('sent');
@@ -1004,7 +1040,7 @@ export default function PosTerminal() {
         session_id: activeSession?.id || 1,
         table_id: cart.tableId,
         customer_id: cart.customerId || null,
-        coupon_code: cart.coupon?.coupon_code || null,
+        coupon_code: cart.coupon?.code || null,
         items: cart.items.map(i => ({ product_id: i.id, quantity: i.qty }))
       });
       
@@ -1098,31 +1134,31 @@ export default function PosTerminal() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden select-none">
+    <div className="h-screen bg-cafe-espresso flex flex-col overflow-hidden select-none font-sans text-cafe-cream">
 
       {/* ══════════════════════════════════════════════════════════════════════
           TOP NAV BAR
       ══════════════════════════════════════════════════════════════════════ */}
-      <header className="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center gap-3 z-20">
+      <header className="flex-shrink-0 bg-[#120C07] border-b border-white/5 px-4 py-2.5 flex items-center gap-3 z-20">
 
         {/* Brand */}
         <div className="flex items-center gap-2.5 mr-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-600 rounded-lg flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <div className="w-8 h-8 bg-gradient-to-br from-cafe-latte to-cafe-terracotta rounded-lg flex items-center justify-center shadow-lg">
             <Icons.Coffee />
           </div>
-          <span className="text-white font-extrabold text-sm hidden sm:block tracking-tight">Odoo Cafe</span>
+          <span className="text-cafe-cream font-extrabold text-sm hidden sm:block tracking-tight font-serif">Odoo Cafe</span>
         </div>
 
         {/* Nav pills */}
         <nav className="flex items-center gap-1">
-          <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">
+          <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cafe-latte text-cafe-espresso shadow-sm">
             POS Order
           </span>
           {user?.role !== 'customer' && (
             <button
               id="nav-table-view"
               onClick={() => setShowTable(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-cafe-cream/50 hover:text-cafe-cream hover:bg-white/5 transition-colors flex items-center gap-1.5"
             >
               <Icons.Table /> Table View
             </button>
@@ -1130,7 +1166,7 @@ export default function PosTerminal() {
           <button
             id="nav-orders-btn"
             onClick={() => setShowOrders(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-cafe-cream/50 hover:text-cafe-cream hover:bg-white/5 transition-colors flex items-center gap-1.5"
           >
             📜 Orders
           </button>
@@ -1138,7 +1174,7 @@ export default function PosTerminal() {
             <button
               id="nav-customers-btn"
               onClick={() => setShowCustomers(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-cafe-cream/50 hover:text-cafe-cream hover:bg-white/5 transition-colors flex items-center gap-1.5"
             >
               👥 Customers
             </button>
@@ -1427,24 +1463,52 @@ export default function PosTerminal() {
               <span className="text-gray-400">Subtotal</span>
               <span className="text-white font-medium">{fmt(cart.subtotal)}</span>
             </div>
+            
+            {/* Automatic Product Promotions (Tier 2) */}
+            {orderPreview?.product_discounts && orderPreview.product_discounts.length > 0 && (
+              <div className="space-y-1.5 bg-blue-500/5 rounded-lg p-2.5 border border-blue-500/20">
+                <div className="text-xs font-semibold text-blue-400 flex items-center gap-1">
+                  🏆 Product Offers
+                </div>
+                {orderPreview.product_discounts.map((promo, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400 truncate">{promo.product_name}</span>
+                    <span className="text-blue-400 font-medium">−{fmt(promo.discount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Automatic Order Promotion (Tier 3) */}
+            {orderPreview?.order_discount && (
+              <div className="space-y-1 bg-purple-500/5 rounded-lg p-2.5 border border-purple-500/20">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-purple-400 font-semibold flex items-center gap-1">🎉 {orderPreview.order_discount.promo_name}</span>
+                  <span className="text-purple-400 font-bold">−{fmt(orderPreview.order_discount.discount)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Tax row */}
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">GST / Tax</span>
-              <span className="text-white font-medium">{fmt(cart.tax)}</span>
+              <span className="text-white font-medium">{fmt(orderPreview?.tax || cart.tax)}</span>
             </div>
-            {/* Discount row (only shown when active) */}
-            {cart.discount > 0 && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-emerald-400">
-                  Discount {cart.coupon ? `(${cart.coupon.code})` : ''}
-                </span>
-                <span className="text-emerald-400 font-medium">−{fmt(cart.discount)}</span>
+
+            {/* Manual Coupon Discount (Tier 1) */}
+            {orderPreview?.coupon_discount && (
+              <div className="space-y-1 bg-emerald-500/5 rounded-lg p-2.5 border border-emerald-500/20">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1">🎟️ Coupon ({orderPreview.coupon_discount.coupon_code})</span>
+                  <span className="text-emerald-400 font-bold">−{fmt(orderPreview.coupon_discount.discount)}</span>
+                </div>
               </div>
             )}
+
             {/* Divider */}
             <div className="border-t border-gray-700 pt-2.5 flex items-center justify-between">
               <span className="text-white font-bold text-base">Total</span>
-              <span className="text-amber-400 font-extrabold text-xl tabular-nums">{fmt(cart.total)}</span>
+              <span className="text-amber-400 font-extrabold text-xl tabular-nums">{fmt(orderPreview?.total || cart.total)}</span>
             </div>
           </div>
 

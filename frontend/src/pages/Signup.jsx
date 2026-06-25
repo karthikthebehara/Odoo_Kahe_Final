@@ -56,7 +56,6 @@ const LockIcon = () => (
 );
 
 const ROLES = [
-  { key: 'customer', label: 'Customer', hint: 'Online / Table Order', icon: '🛍️' },
   { key: 'employee', label: 'Employee', hint: 'Cashier / POS Operator', icon: '🧾' },
   { key: 'admin',    label: 'Admin',    hint: 'Manager / Back-office',  icon: '🛡️' },
 ];
@@ -120,13 +119,13 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#0f0e0c] via-[#1a1512] to-[#0f0e0c] flex items-center justify-center p-4 relative overflow-hidden">
 
-      {/* Decorative blobs */}
+      {/* Decorative cafe-themed blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-60 -right-40 w-96 h-96 bg-amber-500/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-orange-500/8 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-violet-500/3 rounded-full blur-3xl" />
+        <div className="absolute -top-60 -right-40 w-96 h-96 bg-[#D07A56]/8 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#C2A688]/8 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#4B6043]/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
@@ -134,7 +133,7 @@ export default function Signup() {
         {/* Back to login */}
         <Link
           to="/login"
-          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-5 w-fit transition-colors duration-150"
+          className="flex items-center gap-1.5 text-[#C2A688]/60 hover:text-[#C2A688] text-sm mb-5 w-fit transition-colors duration-150 font-semibold"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
             <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd"/>
@@ -143,28 +142,28 @@ export default function Signup() {
         </Link>
 
         {/* Card */}
-        <div className="bg-gray-900/80 backdrop-blur-xl border border-gray-700/60 rounded-3xl shadow-2xl p-8">
+        <div className="bg-gradient-to-b from-[#1a110b]/95 to-[#0f0a07]/95 backdrop-blur-xl border border-[#C2A688]/15 rounded-3xl shadow-2xl shadow-black/50 p-8">
 
           {/* Logo + Title */}
           <div className="flex flex-col items-center mb-7">
-            <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30 mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-[#C2A688] to-[#D07A56] rounded-2xl flex items-center justify-center shadow-lg shadow-[#D07A56]/30 mb-4">
               <CoffeeIcon />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Create Account</h1>
-            <p className="text-gray-400 text-sm mt-1">Register a new staff member</p>
+            <h1 className="text-3xl font-black text-white tracking-tight">Create Account</h1>
+            <p className="text-[#C2A688]/60 text-sm mt-2 font-semibold">Register a new staff member</p>
           </div>
 
           {/* Role selector */}
-          <div className="flex bg-gray-800/70 rounded-xl p-1 mb-6 gap-1">
+          <div className="flex bg-[#0f0a07]/60 border border-[#C2A688]/15 rounded-2xl p-2 mb-6 gap-2">
             {ROLES.map(r => (
               <button
                 key={r.key}
                 type="button"
                 onClick={() => setRole(r.key)}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300
                   ${role === r.key
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-gray-950 shadow-md'
-                    : 'text-gray-400 hover:text-white'}`}
+                    ? 'bg-gradient-to-r from-[#C2A688] to-[#D07A56] text-[#0f0a07] shadow-lg shadow-[#D07A56]/30'
+                    : 'text-[#C2A688]/60 hover:text-[#C2A688] hover:bg-[#C2A688]/5 border border-transparent hover:border-[#C2A688]/20'}`}
               >
                 <span className="block">{r.icon} {r.label}</span>
                 <span className="block text-[10px] opacity-75">{r.hint}</span>
@@ -177,11 +176,11 @@ export default function Signup() {
 
             {/* Full Name */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-black text-[#C2A688] mb-2 uppercase tracking-widest">
                 Full Name
               </label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#C2A688]/40">
                   <UserIcon />
                 </div>
                 <input
@@ -191,20 +190,20 @@ export default function Signup() {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="John Smith"
-                  className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-xl pl-9 pr-4 py-3
-                             placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1
-                             focus:ring-amber-500/50 transition-all duration-200 text-sm"
+                  className="w-full bg-[#0f0a07]/40 border border-[#C2A688]/20 text-white rounded-xl pl-10 pr-4 py-3
+                             placeholder-[#C2A688]/30 focus:outline-none focus:border-[#C2A688]/50 focus:ring-1
+                             focus:ring-[#C2A688]/30 transition-all duration-200 text-sm font-medium"
                 />
               </div>
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-black text-[#C2A688] mb-2 uppercase tracking-widest">
                 Email Address
               </label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#C2A688]/40">
                   <MailIcon />
                 </div>
                 <input
@@ -213,21 +212,21 @@ export default function Signup() {
                   autoComplete="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder={role === 'admin' ? 'manager@cafe.com' : 'john@cafe.com'}
-                  className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-xl pl-9 pr-4 py-3
-                             placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1
-                             focus:ring-amber-500/50 transition-all duration-200 text-sm"
+                  placeholder={role === 'admin' ? 'manager@cafe.com' : 'employee@cafe.com'}
+                  className="w-full bg-[#0f0a07]/40 border border-[#C2A688]/20 text-white rounded-xl pl-10 pr-4 py-3
+                             placeholder-[#C2A688]/30 focus:outline-none focus:border-[#C2A688]/50 focus:ring-1
+                             focus:ring-[#C2A688]/30 transition-all duration-200 text-sm font-medium"
                 />
               </div>
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-black text-[#C2A688] mb-2 uppercase tracking-widest">
                 Password
               </label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#C2A688]/40">
                   <LockIcon />
                 </div>
                 <input
@@ -237,14 +236,14 @@ export default function Signup() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Min. 6 characters"
-                  className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-xl pl-9 pr-10 py-3
-                             placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1
-                             focus:ring-amber-500/50 transition-all duration-200 text-sm"
+                  className="w-full bg-[#0f0a07]/40 border border-[#C2A688]/20 text-white rounded-xl pl-10 pr-10 py-3
+                             placeholder-[#C2A688]/30 focus:outline-none focus:border-[#C2A688]/50 focus:ring-1
+                             focus:ring-[#C2A688]/30 transition-all duration-200 text-sm font-medium"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-400 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#C2A688]/40 hover:text-[#C2A688] transition-colors"
                 >
                   <EyeIcon show={showPwd} />
                 </button>
@@ -254,15 +253,18 @@ export default function Signup() {
               {password && (
                 <div className="mt-2">
                   <div className="flex gap-1">
-                    {[1,2,3,4].map(i => (
-                      <div
-                        key={i}
-                        className="flex-1 h-1 rounded-full transition-all duration-300"
-                        style={{ backgroundColor: i <= score ? STRENGTH_COLORS[score] : '#374151' }}
-                      />
-                    ))}
+                    {[1,2,3,4].map(i => {
+                      const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e'];
+                      return (
+                        <div
+                          key={i}
+                          className="flex-1 h-1.5 rounded-full transition-all duration-300"
+                          style={{ backgroundColor: i <= score ? colors[score - 1] : 'rgba(194, 166, 136, 0.1)' }}
+                        />
+                      );
+                    })}
                   </div>
-                  <p className="text-[11px] mt-1" style={{ color: STRENGTH_COLORS[score] }}>
+                  <p className="text-[11px] mt-1 font-bold" style={{ color: ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e'][score - 1] }}>
                     {STRENGTH_LABELS[score]}
                   </p>
                 </div>
@@ -271,11 +273,11 @@ export default function Signup() {
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-black text-[#C2A688] mb-2 uppercase tracking-widest">
                 Confirm Password
               </label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#C2A688]/40">
                   <LockIcon />
                 </div>
                 <input
@@ -285,23 +287,23 @@ export default function Signup() {
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
                   placeholder="Re-enter password"
-                  className={`w-full bg-gray-800/80 border text-white rounded-xl pl-9 pr-10 py-3
-                             placeholder-gray-500 focus:outline-none focus:ring-1 transition-all duration-200 text-sm
+                  className={`w-full bg-[#0f0a07]/40 border text-white rounded-xl pl-10 pr-10 py-3
+                             placeholder-[#C2A688]/30 focus:outline-none focus:ring-1 transition-all duration-200 text-sm font-medium
                              ${passwordsMismatch
-                               ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/30'
+                               ? 'border-[#D07A56]/60 focus:border-[#D07A56] focus:ring-[#D07A56]/30'
                                : passwordsMatch
-                                 ? 'border-emerald-500/70 focus:border-emerald-500 focus:ring-emerald-500/30'
-                                 : 'border-gray-700 focus:border-amber-500 focus:ring-amber-500/50'}`}
+                                 ? 'border-[#4B6043]/60 focus:border-[#4B6043] focus:ring-[#4B6043]/30'
+                                 : 'border-[#C2A688]/20 focus:border-[#C2A688]/50 focus:ring-[#C2A688]/30'}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConf(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-amber-400 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#C2A688]/40 hover:text-[#C2A688] transition-colors"
                 >
                   <EyeIcon show={showConf} />
                 </button>
                 {passwordsMatch && (
-                  <div className="absolute right-9 top-1/2 -translate-y-1/2 text-emerald-400">
+                  <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[#4B6043]">
                     <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
@@ -309,13 +311,13 @@ export default function Signup() {
                 )}
               </div>
               {passwordsMismatch && (
-                <p className="text-red-400 text-[11px] mt-1">Passwords do not match</p>
+                <p className="text-[#D07A56] text-[11px] mt-1 font-bold">Passwords do not match</p>
               )}
             </div>
 
             {/* Error */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400 flex items-start gap-2">
+              <div className="bg-[#D07A56]/10 border border-[#D07A56]/30 rounded-xl px-4 py-3 text-sm text-[#D07A56] flex items-start gap-2 font-medium">
                 <span className="mt-0.5 flex-shrink-0">⚠</span>
                 <span>{error}</span>
               </div>
@@ -323,7 +325,7 @@ export default function Signup() {
 
             {/* Success */}
             {success && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3 text-sm text-emerald-400 flex items-start gap-2">
+              <div className="bg-[#4B6043]/10 border border-[#4B6043]/30 rounded-xl px-4 py-3 text-sm text-[#4B6043] flex items-start gap-2 font-medium">
                 <span className="mt-0.5 flex-shrink-0">✅</span>
                 <span>{success}</span>
               </div>
@@ -334,26 +336,26 @@ export default function Signup() {
               id="signup-submit"
               type="submit"
               disabled={loading || !!success}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400
-                         hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-950
-                         font-bold py-3.5 rounded-xl shadow-lg shadow-amber-500/25 transition-all
-                         duration-200 text-sm tracking-wide flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-gradient-to-r from-[#C2A688] to-[#D07A56] hover:from-[#D07A56]
+                         hover:to-[#C2A688] disabled:opacity-50 disabled:cursor-not-allowed text-[#0f0a07]
+                         font-black py-4 rounded-xl shadow-lg shadow-[#D07A56]/30 transition-all
+                         duration-200 text-sm tracking-wider flex items-center justify-center gap-2 mt-3"
             >
               {loading ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-gray-900/40 border-t-gray-900 rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-[#0f0a07]/40 border-t-[#0f0a07] rounded-full animate-spin" />
                   Creating account…
                 </>
               ) : (
-                `Create ${role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : 'Customer'} Account`
+                `Create ${role === 'admin' ? 'Admin' : 'Employee'} Account`
               )}
             </button>
           </form>
 
           {/* Footer link */}
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="text-center text-sm text-[#C2A688]/50 mt-6 font-medium">
             Already have an account?{' '}
-            <Link to="/login" className="text-amber-400 hover:text-amber-300 font-semibold transition-colors">
+            <Link to="/login" className="text-[#D07A56] hover:text-[#C2A688] font-black transition-colors">
               Sign in
             </Link>
           </p>

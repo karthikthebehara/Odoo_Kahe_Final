@@ -10,6 +10,7 @@
  * ────────────────────
  * Orders
  *   POST   /api/orders                                    → createOrder  (with 3-tier promo engine)
+ *   POST   /api/orders/preview                           → previewOrderDiscounts (calculate discounts, no save)
  *   GET    /api/orders                                    → getOrders    (active orders + items)
  *   GET    /api/orders/:id                                → getOrderById (single order + items)
  *   PUT    /api/orders/:id/status                         → updateOrderStatus
@@ -30,6 +31,7 @@ const router  = express.Router();
 
 const {
   createOrder,
+  previewOrderDiscounts,
   updateOrderStatus,
   updateKdsStatus,
   updateItemCompletion,
@@ -129,6 +131,31 @@ const { verifyToken } = require('../middleware/auth');
  * }
  */
 router.post('/orders', verifyToken, createOrder);
+
+/**
+ * POST /api/orders/preview
+ * Preview all automatic & manual discounts WITHOUT creating the order.
+ * Used by frontend to show real-time discount applications in the cart.
+ *
+ * Body: {
+ *   items: [{ product_id: number, quantity: number }]
+ *   coupon_code?: string
+ * }
+ *
+ * Response: {
+ *   success: true,
+ *   data: {
+ *     subtotal: number,
+ *     product_discounts: [{ product_id, product_name, promo_name, discount }],
+ *     order_discount: { promo_name, discount }?,
+ *     coupon_discount: { coupon_code, promo_name, discount }?,
+ *     total_discount: number,
+ *     tax: number,
+ *     total: number
+ *   }
+ * }
+ */
+router.post('/orders/preview', previewOrderDiscounts);
 
 /**
  * GET /api/orders

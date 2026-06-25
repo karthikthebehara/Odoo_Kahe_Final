@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 const Icons = {
   Coffee: () => (
     <svg className="w-16 h-16 text-amber-500 animate-bounce" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z M6 2v2M10 2v2M14 2v2" />
     </svg>
   ),
   CheckCircle: () => (
@@ -115,7 +115,7 @@ export default function CustomerDisplay() {
       {/* ==========================================
           LEFT SIDE COLUMN (Fixed Brand Display)
          ========================================== */}
-      <div className="w-5/12 bg-[#0d1527]/90 border-r border-slate-800/80 flex flex-col justify-between p-12 relative overflow-hidden">
+      <div className="w-5/12 bg-[#0d1527]/90 border-r border-slate-800/80 flex flex-col justify-between p-6 lg:p-12 relative overflow-hidden">
         {/* Subtle decorative glowing background gradients */}
         <div className="absolute top-[-20%] left-[-20%] w-80 h-80 rounded-full bg-amber-500/10 blur-[80px] pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 rounded-full bg-blue-500/10 blur-[70px] pointer-events-none" />
@@ -157,7 +157,7 @@ export default function CustomerDisplay() {
       {/* ==========================================
           RIGHT SIDE COLUMN (Dynamic States)
          ========================================== */}
-      <div className="w-7/12 flex flex-col justify-between p-12 bg-[#070b19] relative">
+      <div className="w-7/12 flex flex-col justify-between p-6 lg:p-12 bg-[#070b19] relative">
         {/* State A: Cart Active */}
         {data.state === 'CART' && (
           <>

@@ -8,11 +8,17 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['Playfair Display', 'Georgia', 'serif'],
       },
       colors: {
         gray: {
           950: '#030712',
         },
+        'cafe-cream': '#FDFBF7',
+        'cafe-espresso': '#1A110B',
+        'cafe-latte': '#C2A688',
+        'cafe-matcha': '#4B6043',
+        'cafe-terracotta': '#D07A56',
       },
       borderWidth: {
         3: '3px',

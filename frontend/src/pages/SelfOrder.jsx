@@ -145,6 +145,10 @@ export default function SelfOrder() {
   const [selectedPayment, setSelectedPayment] = useState('UPI');
   const [transactionRef, setTransactionRef] = useState('');
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  // Guest contact details for billing
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
 
   // Submission / Polling
   const [submitting, setSubmitting] = useState(false);
@@ -152,6 +156,10 @@ export default function SelfOrder() {
   const [trackedOrderId, setTrackedOrderId] = useState(null);
   const [trackedOrderData, setTrackedOrderData] = useState(null);
   const pollIntervalRef = useRef(null);
+  // Server-side preview and final receipt
+  const [orderPreview, setOrderPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [orderReceipt, setOrderReceipt] = useState(null);
 
   // ─────────────────────────────────────────────────────────────────────────
   // BOOT: verify token and load initial master data
@@ -273,22 +281,23 @@ export default function SelfOrder() {
   // ─────────────────────────────────────────────────────────────────────────
   // MATH TOTALS
   // ─────────────────────────────────────────────────────────────────────────
+  // Prefer server preview totals when available to match backend promo engine
   const totals = (() => {
+    if (orderPreview && orderPreview.data) {
+      const p = orderPreview.data;
+      return { subtotal: p.subtotal, tax: p.tax, discount: p.total_discount, total: p.total };
+    }
     const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
     const taxRate = 0.05;
     const tax = subtotal * taxRate;
-    let discount = 0;
-
-    if (couponInfo) {
+    const discount = couponInfo ? (() => {
       if (couponInfo.discount_type === 'percentage') {
-        discount = (subtotal * couponInfo.discount_value) / 100;
-        if (couponInfo.max_discount_amount) {
-          discount = Math.min(discount, couponInfo.max_discount_amount);
-        }
-      } else {
-        discount = Math.min(couponInfo.discount_value, subtotal);
+        let d = (subtotal * couponInfo.value) / 100;
+        if (couponInfo.max_discount_amount) d = Math.min(d, couponInfo.max_discount_amount);
+        return d;
       }
-    }
+      return Math.min(couponInfo.value, subtotal);
+    })() : 0;
     const total = Math.max(subtotal + tax - discount, 0);
     return { subtotal, tax, discount, total };
   })();
@@ -317,11 +326,52 @@ export default function SelfOrder() {
     }
   };
 
+  // Fetch server preview when cart or coupon changes (debounced)
+  useEffect(() => {
+    let mounted = true;
+    let timer = null;
+    const fetchPreview = async () => {
+      if (cart.length === 0) {
+        setOrderPreview(null);
+        return;
+      }
+      setPreviewLoading(true);
+      try {
+        const payload = {
+          items: cart.map(i => ({ product_id: i.productId, quantity: i.qty })),
+          coupon_code: couponInput || null
+        };
+        const res = await publicApi.post('/api/orders/preview', payload);
+        if (!mounted) return;
+        setOrderPreview(res.data || res.data?.data || null);
+      } catch (err) {
+        // ignore preview errors for now
+        setOrderPreview(null);
+      } finally {
+        if (mounted) setPreviewLoading(false);
+      }
+    };
+    timer = setTimeout(fetchPreview, 450);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [cart, couponInput]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // CHECKOUT ORDER SUBMIT
   // ─────────────────────────────────────────────────────────────────────────
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+    // Require contact details for billing
+    if (!customerName.trim()) {
+      setSubmitError('Please enter your name for the bill.');
+      return;
+    }
+    if (!customerPhone.trim()) {
+      setSubmitError('Please enter your contact phone number.');
+      return;
+    }
     if (!transactionRef.trim()) {
       setSubmitError('Please enter the UPI Transaction Reference Number (UTR) to confirm your payment.');
       return;
@@ -345,6 +395,9 @@ export default function SelfOrder() {
           payment_method: 'UPI',
           payment_ref: transactionRef,
           status: 'paid',
+          customer_name: customerName.trim(),
+          customer_email: customerEmail.trim() || null,
+          customer_phone: customerPhone.trim() || null,
         };
 
         const res = await publicApi.post('/api/self-order/order', payload);
@@ -354,6 +407,8 @@ export default function SelfOrder() {
         if (!orderId) throw new Error('No order identifier returned by server.');
 
         setTrackedOrderId(orderId);
+        // store server-side order payload for receipt printing/view
+        setOrderReceipt(data);
         setPhase('confirmed');
       } catch (err) {
         setSubmitError(err.response?.data?.error || err.message || 'Payment failed. Please verify items and try again.');
@@ -362,6 +417,39 @@ export default function SelfOrder() {
         setSubmitting(false);
       }
     }, 1800);
+  };
+
+  const handlePrintReceipt = () => {
+    if (!orderReceipt) return;
+    try {
+      const w = window.open('', '_blank');
+      const o = orderReceipt;
+      const itemsHtml = (o.items || []).map(it => `
+        <tr>
+          <td>${it.quantity}× ${it.product_name}</td>
+          <td style="text-align:right">₹${Number(it.subtotal).toFixed(2)}</td>
+        </tr>
+      `).join('');
+      const promoHtml = o.promotions_applied && o.promotions_applied.coupon ?
+        `<tr><td>Coupon (${o.promotions_applied.coupon.coupon_code})</td><td style="text-align:right">-₹${Number(o.promotions_applied.coupon.discount_applied).toFixed(2)}</td></tr>` : '';
+
+      const html = `
+        <html><head><title>Receipt ${o.order.order_number}</title>
+        <style>body{font-family:Arial,sans-serif;padding:20px;color:#111}table{width:100%;border-collapse:collapse}td{padding:6px 0}</style>
+        </head><body>
+        <h2>Odoo Café</h2>
+        <p>Order: ${o.order.order_number}<br/>Amount: ₹${Number(o.order.total_amount).toFixed(2)}</p>
+        <table>${itemsHtml}${promoHtml}</table>
+        <hr/>
+        <p>Total: <strong>₹${Number(o.order.total_amount).toFixed(2)}</strong></p>
+        </body></html>
+      `;
+      w.document.write(html);
+      w.document.close();
+      w.print();
+    } catch (e) {
+      console.warn('Print failed', e);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -465,7 +553,6 @@ export default function SelfOrder() {
 
               {/* Two Option Buttons */}
               <div className="grid grid-cols-1 gap-3">
-              {config?.mode !== 'qr' && (
                 <button
                   onClick={() => {
                     setIsMenuOnly(false);
@@ -475,7 +562,6 @@ export default function SelfOrder() {
                 >
                   <span>🛒</span> Order Online (Self-Order)
                 </button>
-              )}
 
                 <button
                   onClick={() => {
@@ -911,6 +997,43 @@ export default function SelfOrder() {
                 )}
               </div>
 
+              {/* Guest contact details for bill */}
+              <div className="bg-slate-900/40 border border-slate-850 rounded-2xl p-4 space-y-3">
+                <label className="text-slate-400 text-[10px] font-black uppercase tracking-wider block ml-1">Your Details (for bill)</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <label htmlFor="customer-name" className="sr-only">Full name</label>
+                  <input
+                    id="customer-name"
+                    name="customer_name"
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Full name"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white placeholder-slate-700 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none transition-colors"
+                  />
+                  <label htmlFor="customer-email" className="sr-only">Email</label>
+                  <input
+                    id="customer-email"
+                    name="customer_email"
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="Email (optional)"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white placeholder-slate-700 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none transition-colors"
+                  />
+                  <label htmlFor="customer-phone" className="sr-only">Phone number</label>
+                  <input
+                    id="customer-phone"
+                    name="customer_phone"
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value.replace(/[^0-9+\- ]/g, ''))}
+                    placeholder="Phone number"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white placeholder-slate-700 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
               {/* Billing Details breakdown */}
               <div className="bg-slate-900/80 border border-slate-850 rounded-3xl p-5 space-y-3.5">
                 <h4 className="text-white font-black text-xs uppercase tracking-wider">Bill Summary</h4>
@@ -965,10 +1088,12 @@ export default function SelfOrder() {
 
                 {/* Reference / UTR Input Field */}
                 <div className="space-y-2 border-t border-slate-850 pt-4">
-                  <label className="text-slate-400 text-[10px] font-black uppercase tracking-wider block ml-1">
+                  <label htmlFor="transaction-ref" className="text-slate-400 text-[10px] font-black uppercase tracking-wider block ml-1">
                     UPI Transaction ID / Ref No (UTR)
                   </label>
                   <input
+                    id="transaction-ref"
+                    name="payment_ref"
                     type="text"
                     value={transactionRef}
                     onChange={(e) => setTransactionRef(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
@@ -1026,7 +1151,10 @@ export default function SelfOrder() {
               </div>
 
               <div className="space-y-4">
+                <label htmlFor="coupon-input" className="sr-only">Coupon code</label>
                 <input
+                  id="coupon-input"
+                  name="coupon_code"
                   type="text"
                   placeholder="Enter a coupon code (e.g. WELCOME10)"
                   value={couponInput}
@@ -1114,11 +1242,25 @@ export default function SelfOrder() {
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Amount Paid</p>
                   <p className="text-white font-extrabold text-sm mt-0.5">{fmt(totals.total)}</p>
                 </div>
+                {customerName && (
+                  <div className="pt-2">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Customer</p>
+                    <p className="text-white font-extrabold text-sm mt-0.5">{customerName}{customerPhone ? ` • ${customerPhone}` : ''}</p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Track My Order button */}
             <div className="space-y-3">
+              {orderReceipt && (
+                <button
+                  onClick={handlePrintReceipt}
+                  className="w-full py-4 bg-slate-800 text-amber-400 font-black text-sm rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2"
+                >
+                  🧾 View / Print Bill
+                </button>
+              )}
               <button
                 onClick={() => setPhase('tracker')}
                 className="w-full py-4.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-sm rounded-2xl shadow-xl hover:from-amber-400 hover:to-orange-400 active:scale-98 transition-all flex items-center justify-center gap-2"
@@ -1158,6 +1300,9 @@ export default function SelfOrder() {
                 <div className="text-right">
                   <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Dining Location</p>
                   <p className="text-white font-extrabold text-sm mt-0.5">Table {tableInfo?.table_number}</p>
+                  {trackedOrderData?.customer_name && (
+                    <p className="text-slate-400 text-xs mt-1">{trackedOrderData.customer_name}{trackedOrderData.customer_phone ? ` • ${trackedOrderData.customer_phone}` : ''}</p>
+                  )}
                 </div>
               </div>
 
